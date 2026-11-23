@@ -1,0 +1,3029 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b2033">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex, nofollow">
+<title>La Oficina de Correspondencia</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231b2033'/%3E%3Crect x='6' y='9' width='20' height='14' rx='2' fill='%23e8a0b4'/%3E%3Cpath d='M6 11l10 7 10-7' stroke='%231b2033' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<style>
+/*
+ ////////////////////////////////////////////////////////////////////
+ ///////////////////////  ESTILOS GENERALES  ////////////////////////
+ ////////////////////////////////////////////////////////////////////
+ Reglas: colores planos (sin degradados), diseño pensado primero para
+ el teléfono, sin emojis.
+*/
+
+:root {
+  --night:  #1b2033;
+  --night2: #232a42;
+  --night3: #2c3552;
+  --deep:   #0f1424;
+  --black:  #070914;
+  --pink:   #e8a0b4;
+  --pinkdk: #c97b96;
+  --pinkpl: #f4cfd9;
+  --cream:  #f3e9dc;
+  --cream2: #d9c8ae;
+  --amber:  #e0a458;
+  --serif:  "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --mono:   ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--black);
+  color: var(--cream);
+  font-family: var(--serif);
+  overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+.hidden { display: none !important; }
+
+/* ============================ CONTENEDOR ============================ */
+#app {
+  position: relative;
+  width: min(100vw, 480px);
+  height: 100vh; height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--night);
+}
+#screen, .scene { position: absolute; inset: 0; overflow: hidden; }
+.scene svg { width: 100%; height: 100%; display: block; touch-action: none; }
+.scene.enter { animation: sceneIn .9s ease both; }
+@keyframes sceneIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ============================== BOTONES ============================== */
+.btn {
+  background: transparent;
+  border: 1.5px solid var(--pink);
+  color: var(--pinkpl);
+  font-family: var(--mono);
+  font-size: 13px; letter-spacing: .2em; text-transform: uppercase;
+  padding: 14px 30px; border-radius: 2px;
+  transition: background .2s, color .2s, transform .15s;
+}
+.btn:active { background: var(--pink); color: var(--night); transform: scale(.97); }
+.btn.small { padding: 10px 22px; font-size: 12px; }
+
+/* ================================ HUD ================================ */
+#hud {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: calc(var(--safe-t) + 10px) 12px 10px;
+  background: rgba(15, 20, 36, .62);
+  pointer-events: none;
+}
+#hud > * { pointer-events: auto; }
+#tray { display: flex; gap: 6px; }
+.slot {
+  width: 28px; height: 34px; border: 1.5px solid rgba(217, 200, 174, .35);
+  border-radius: 3px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 19px; color: var(--pink);
+  transition: border-color .4s, background .4s;
+}
+.slot.on { border-color: var(--pink); background: rgba(232, 160, 180, .12); }
+.slot.pop { animation: pop .6s ease; }
+@keyframes pop { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }
+#hud-btns { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: transparent; border: 1.5px solid rgba(217, 200, 174, .5);
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.icon-btn svg { width: 18px; height: 18px; stroke: var(--cream); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn.off svg { opacity: .4; }
+.hint-btn {
+  height: 38px; padding: 0 16px; border-radius: 19px;
+  background: transparent; border: 1.5px solid rgba(232, 160, 180, .45);
+  color: rgba(244, 207, 217, .6);
+  font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+  min-width: 82px;
+}
+.hint-btn.ready { border-color: var(--pink); color: var(--pinkpl); animation: pulseBtn 2.2s ease-in-out infinite; }
+@keyframes pulseBtn { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
+/* ============================ SUBTÍTULOS ============================ */
+#subtitle {
+  position: absolute; left: 14px; right: 14px; z-index: 30;
+  bottom: calc(var(--safe-b) + 22px);
+  text-align: center; font-style: italic; font-size: 16px; line-height: 1.4;
+  color: var(--cream);
+  background: rgba(15, 20, 36, .86);
+  padding: 10px 14px; border-radius: 3px;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .5s, transform .5s;
+  pointer-events: none;
+}
+#subtitle.on { opacity: 1; transform: none; }
+
+/* ============================ LETTERBOX ============================= */
+.bar {
+  position: absolute; left: 0; right: 0; height: 0; z-index: 60;
+  background: var(--black); transition: height 1.4s cubic-bezier(.6, 0, .2, 1);
+  pointer-events: none;
+}
+#bar-top { top: 0; } #bar-bottom { bottom: 0; }
+.bars-on #bar-top, .bars-on #bar-bottom { height: 9dvh; }
+
+/* ============================== CAPAS ================================ */
+.layer { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
+.layer.on { pointer-events: auto; }
+#title-layer { z-index: 80; }
+#digit-layer { z-index: 70; }
+.backdrop { position: absolute; inset: 0; background: rgba(7, 9, 20, .62); opacity: 0; transition: opacity .35s; }
+.layer.on .backdrop { opacity: 1; }
+
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 24px 22px calc(var(--safe-b) + 22px);
+  border-radius: 14px 14px 0 0;
+  transform: translateY(105%); transition: transform .45s cubic-bezier(.2, .8, .2, 1);
+}
+.layer.on .sheet { transform: rotate(var(--rot, 0deg)); }
+.sheet .kick {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .24em; text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.sheet p { margin: 0 0 18px; font-size: 18px; line-height: 1.5; }
+.sheet .row { display: flex; justify-content: flex-end; }
+
+.sheet.paper { background: var(--cream); color: var(--night); }
+.sheet.paper .kick { color: var(--pinkdk); }
+.sheet.paper .btn { border-color: var(--night); color: var(--night); }
+.sheet.paper .btn:active { background: var(--night); color: var(--cream); }
+
+.sheet.hints { background: var(--night3); color: var(--cream); border-top: 2px solid var(--pink); }
+.sheet.hints .kick { color: var(--pink); }
+.sheet.hints .pista { margin-bottom: 14px; padding-left: 12px; border-left: 2px solid rgba(232, 160, 180, .35); opacity: .62; font-size: 16px; }
+.sheet.hints .pista.new { opacity: 1; border-left-color: var(--pink); font-size: 18px; }
+.sheet.hints .pista b { display: block; font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: .2em; color: var(--pink); text-transform: uppercase; margin-bottom: 3px; }
+
+/* Casillas de dígitos dentro de tarjetas */
+.cajas { display: flex; gap: 8px; margin: 4px 0 18px; }
+.cajas span {
+  width: 40px; height: 48px; border: 1.5px solid var(--night); border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 24px;
+}
+
+/* ======================= REVELACIÓN DE DÍGITO ======================== */
+#digit-layer .bg { position: absolute; inset: 0; background: rgba(15, 20, 36, .94); opacity: 0; transition: opacity .6s; }
+#digit-layer.on .bg { opacity: 1; }
+#digit-layer .center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 18px; padding: 24px;
+}
+.polaroid {
+  width: 190px; background: var(--cream); padding: 10px 10px 34px; border-radius: 2px;
+  transform: rotate(-3deg) translateY(-30px); opacity: 0;
+  transition: transform .9s cubic-bezier(.2, .8, .2, 1) .5s, opacity .9s .5s;
+}
+.polaroid .ph { width: 100%; aspect-ratio: 1 / 1; background: var(--night3); overflow: hidden; display: flex; }
+.polaroid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tag {
+  position: relative; width: 200px; padding: 30px 12px 18px; background: var(--cream); color: var(--night);
+  text-align: center; border-radius: 4px 4px 4px 28px;
+  transform: translateY(-50px) rotate(2deg); opacity: 0;
+  transition: transform .9s cubic-bezier(.2, .8, .2, 1) .2s, opacity .7s .2s;
+}
+.tag::before { content: ""; position: absolute; top: 10px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--night); }
+.tag .lab { font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--pinkdk); }
+.tag .num { font-family: var(--mono); font-size: 84px; line-height: 1.05; margin-top: 4px; transform: scale(1.7); opacity: 0; transition: transform .5s cubic-bezier(.2, .9, .3, 1.2) 1s, opacity .3s 1s; }
+#digit-layer.in .polaroid, #digit-layer.in .tag { transform: none; opacity: 1; }
+#digit-layer.in .polaroid { transform: rotate(-3deg); }
+#digit-layer.in .tag { transform: rotate(2deg); }
+#digit-layer.in .num { transform: scale(1); opacity: 1; }
+#digit-layer .btn { opacity: 0; transition: opacity .6s 1.8s; }
+#digit-layer.in .btn { opacity: 1; }
+
+/* ========================== TARJETA DE TÍTULO ======================== */
+#title-layer { background: var(--black); opacity: 0; transition: opacity .8s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 30px; }
+#title-layer.on { opacity: 1; }
+#title-layer .k { font-family: var(--mono); font-size: 12px; letter-spacing: .4em; text-transform: uppercase; color: var(--pink); }
+#title-layer .t { font-size: 30px; line-height: 1.2; color: var(--cream); max-width: 300px; }
+#title-layer .l { width: 54px; height: 2px; background: var(--pink); transform: scaleX(0); transition: transform 1s .3s; }
+#title-layer.on .l { transform: scaleX(1); }
+
+/* ================================ FADE ================================ */
+#fade { position: absolute; inset: 0; background: var(--black); opacity: 0; pointer-events: none; transition: opacity .9s; z-index: 90; }
+#fade.on { opacity: 1; }
+
+/* ============================== PORTADA ============================== */
+.cover {
+  position: absolute; inset: 0; background: var(--night);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 18px; padding: 30px;
+}
+.cover .k { font-family: var(--mono); font-size: 12px; letter-spacing: .4em; text-transform: uppercase; color: var(--pink); }
+.cover h1 { font-weight: 400; font-size: 36px; line-height: 1.15; margin: 0; max-width: 320px; color: var(--cream); }
+.cover .line { width: 54px; height: 2px; background: var(--pink); }
+.cover .note { font-family: var(--mono); font-size: 11px; letter-spacing: .16em; color: var(--cream2); opacity: .7; text-transform: uppercase; }
+.cover .btn { margin-top: 20px; }
+.rain-bg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; }
+.cover > *:not(.rain-bg) { position: relative; }
+
+.intro-wrap {
+  position: absolute; inset: 0; background: var(--night);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0 30px; text-align: center;
+}
+.intro-text { font-size: 21px; line-height: 1.55; max-width: 320px; min-height: 8.5em; color: var(--cream); display: flex; align-items: center; justify-content: center; }
+.intro-sub { position: absolute; bottom: calc(var(--safe-b) + 14dvh); font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--pink); opacity: 0; transition: opacity .6s; }
+.intro-sub.on { opacity: .85; animation: blink 1.8s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.intro-wrap .btn { margin-top: 10px; opacity: 0; pointer-events: none; transition: opacity .8s; }
+.intro-wrap .btn.on { opacity: 1; pointer-events: auto; }
+
+/* ============================= ANIMACIONES ============================ */
+.rain line { stroke: #8fa4d4; stroke-width: 1; opacity: .5; animation: rain linear infinite; }
+@keyframes rain { from { transform: translateY(-40px); } to { transform: translateY(260px); } }
+.steam path { animation: steam 3.2s ease-in-out infinite; opacity: 0; }
+.steam path:nth-child(2) { animation-delay: 1.4s; }
+@keyframes steam { 0% { opacity: 0; transform: translateY(4px); } 40% { opacity: .5; } 100% { opacity: 0; transform: translateY(-10px); } }
+.shake { animation: shake .45s; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+.dust circle { animation: floatUp linear infinite; opacity: 0; }
+@keyframes floatUp { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: .55; } 100% { opacity: 0; transform: translateY(-190px); } }
+.pulse-soft { animation: pulseSoft 2.4s ease-in-out infinite; }
+@keyframes pulseSoft { 50% { opacity: .35; } }
+
+svg .tappable { cursor: pointer; }
+svg text { font-family: var(--mono); }
+svg .serif { font-family: var(--serif); }
+
+/* =============================== DEV ================================= */
+#dev { position: absolute; left: 6px; bottom: 6px; z-index: 100; display: flex; gap: 4px; flex-wrap: wrap; max-width: 90%; }
+#dev button { background: #000a; border: 1px solid #fff5; color: #fff; font-size: 11px; padding: 4px 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rain line, .steam path, .dust circle, .pulse-soft, .hint-btn.ready { animation: none; }
+}
+
+/* ============================ ESCENA FINAL ============================ */
+.final-text {
+  position: absolute; left: 22px; right: 22px; bottom: calc(9dvh + 54px);
+  text-align: center; font-size: 22px; line-height: 1.45; color: var(--cream);
+  min-height: 3em; display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.final-firma {
+  position: absolute; left: 0; right: 0; bottom: calc(9dvh + 20px);
+  text-align: center; font-family: var(--mono); font-size: 13px; letter-spacing: .3em; color: var(--pink);
+  opacity: 0; transition: opacity 1.6s; pointer-events: none;
+}
+.final-firma.on { opacity: 1; }
+
+.scene .cover-env { display: block; width: 96px; height: 70px; margin-bottom: 4px; }
+.cover .btn { background: var(--night); }
+
+/* ===================== AJUSTES “HECHO A MANO” ===================== */
+/* Grano de película (ruido fino que se mueve a saltos) */
+#grain {
+  position: absolute; inset: -60px; z-index: 12; pointer-events: none; opacity: .09;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
+  animation: grano .7s steps(1) infinite;
+}
+@keyframes grano {
+  0% { transform: translate(0, 0); } 25% { transform: translate(-37px, 21px); }
+  50% { transform: translate(24px, -43px); } 75% { transform: translate(-18px, -29px); }
+}
+/* Tarjetas como papel rasgado */
+.sheet.paper {
+  clip-path: polygon(0 7px, 4% 1px, 10% 6px, 17% 0, 25% 6px, 33% 1px, 41% 5px, 50% 0, 59% 6px, 68% 1px, 76% 5px, 85% 0, 93% 6px, 100% 1px, 100% 100%, 0 100%);
+  padding-top: 30px;
+}
+@media (prefers-reduced-motion: reduce) { #grain { animation: none; } }
+
+/* ===================== PAPELES MENOS PERFECTOS ===================== */
+/* Tarjetas: más anchas que la pantalla para que al girar no se vean los bordes */
+.sheet.paper { left: -10px; right: -10px; padding-left: 32px; padding-right: 32px; transform-origin: 50% 100%; }
+.sheet.paper p { filter: url(#tinta); }
+.sheet.paper::before {                       /* marca de doblez */
+  content: ""; position: absolute; left: 0; right: 0; top: 46%; height: 2px;
+  background: rgba(27, 32, 51, .09); transform: rotate(-.4deg); pointer-events: none;
+}
+.sheet.paper::after {                        /* mancha de taza */
+  content: ""; position: absolute; right: 26px; top: 20px; width: 46px; height: 40px;
+  border: 3px solid rgba(169, 120, 70, .22); border-radius: 46% 54% 50% 50% / 52% 48% 55% 45%;
+  border-right-color: transparent; transform: rotate(18deg); pointer-events: none;
+}
+.cajas span { transform: rotate(var(--r, 0deg)); filter: url(#tinta); }
+.cajas span:nth-child(odd) { --r: -1.4deg; } .cajas span:nth-child(even) { --r: 1.1deg; margin-top: 2px; }
+
+/* Etiqueta del dígito y polaroid: giradas y con la tinta corrida */
+#digit-layer.in .tag { transform: rotate(var(--rot, 2deg)); }
+#digit-layer.in .polaroid { transform: rotate(var(--rot, -3deg)); }
+.tag { border-radius: 0; padding-bottom: 22px; }
+.tag .num { filter: url(#tinta); transform-origin: 50% 60%; }
+#digit-layer.in .num { transform: scale(1) rotate(-3deg); }
+.tag::after {                                /* cinta pegada */
+  content: ""; position: absolute; top: -10px; left: 58%; width: 54px; height: 20px;
+  background: rgba(232, 160, 180, .55); transform: rotate(7deg);
+}
+.polaroid { box-shadow: none; }
+
+/* Mecanismo trabado (penalización por intentos fallidos) */
+.lockout {
+  position: absolute; inset: 0; z-index: 65; background: rgba(15, 20, 36, .88);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  text-align: center; padding: 30px; color: var(--cream);
+}
+.lockout .lk-t { font-family: var(--mono); font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--pink); }
+.lockout .lk-n { font-family: var(--mono); font-size: 64px; line-height: 1; }
+.lockout .lk-s { font-size: 16px; opacity: .75; max-width: 260px; }
+
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="tinta"><feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="3" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+
+<div id="app">
+  <div id="screen"></div>
+
+  <div id="grain"></div>
+
+  <div id="hud" class="hidden">
+    <div id="tray" aria-label="Dígitos encontrados"></div>
+    <div id="hud-btns">
+      <button id="btn-music" class="icon-btn" aria-label="Música" title="Música"></button>
+      <button id="btn-hint" class="hint-btn" aria-label="Pista">Pista</button>
+    </div>
+  </div>
+
+  <div id="subtitle" aria-live="polite"></div>
+
+  <div id="bar-top" class="bar"></div>
+  <div id="bar-bottom" class="bar"></div>
+
+  <div id="card-layer" class="layer"></div>
+  <div id="hint-layer" class="layer"></div>
+  <div id="digit-layer" class="layer"></div>
+  <div id="title-layer" class="layer"></div>
+  <div id="fade"></div>
+  <div id="dev" class="hidden"></div>
+</div>
+
+<noscript><p style="color:#f3e9dc;padding:24px;font-family:serif">Este juego necesita JavaScript activado.</p></noscript>
+
+<script>
+/*
+ ╔══════════════════════════════════════════════════════════════════╗
+ ║  CONFIGURACIÓN DEL JUEGO  —  ESTE ES EL ÚNICO ARCHIVO QUE         ║
+ ║  HAY QUE EDITAR PARA CAMBIAR EL CÓDIGO, LOS NOMBRES Y LOS TEXTOS  ║
+ ╚══════════════════════════════════════════════════════════════════╝
+*/
+
+const CONFIG = {
+
+  ////////////////////////////////////////////////////////////////////
+  ///////////////////////  CÓDIGO DEL CANDADO  ///////////////////////
+  ////////////////////////////////////////////////////////////////////
+  // Solo números. Entre 1 y 4 dígitos (el juego tiene 4 salas).
+  // Cada sala entrega un dígito, en orden. Si el candado es de 3
+  // dígitos, la sala 4 igual se juega pero ya no entrega dígito.
+  // IMPORTANTE: reemplazá este valor por la combinación REAL del candado.
+  CODIGO: "0000",
+
+
+  ////////////////////////////////////////////////////////////////////
+  ///////////////////////  DATOS PERSONALES  /////////////////////////
+  ////////////////////////////////////////////////////////////////////
+  NOMBRE: "Sofía",
+  FIRMA:  "Ju",                // aparece al final del mensaje. Dejar "" para ocultarla.
+  FECHA_NOVIOS: "14/12",       // se ve grabada en el sello rosa (sala 2)
+  FRASE_SECRETA: "OYE SI",     // la frase que se descifra en el archivo (sala 3). En mayúsculas, sin tildes.
+  // (La sala 3 se cifra con FECHA_NOVIOS: cada letra de FRASE_SECRETA usa un número de la fecha.)
+
+
+  ////////////////////////////////////////////////////////////////////
+  ///////////////////////////  FOTOS  ////////////////////////////////
+  ////////////////////////////////////////////////////////////////////
+  // Poné las fotos en la carpeta assets/fotos/ y escribí acá sus nombres.
+  // Si una foto no existe, se muestra un marco con un dibujo en su lugar.
+  FOTOS: {
+    sala3: "assets/fotos/foto1.jpg",   // aparece al abrir el cajón del archivo
+    final: "assets/fotos/foto2.jpg"    // aparece en la escena final (opcional)
+  },
+
+
+  ////////////////////////////////////////////////////////////////////
+  ///////////////////////////  TEXTOS  ///////////////////////////////
+  ////////////////////////////////////////////////////////////////////
+  // {N} se reemplaza por el nombre, {DIGITOS} por "cuatro", "tres", etc.
+  TEXTOS: {
+
+    portadaKicker: "Para {N}",
+    portadaTitulo: "La Oficina de Correspondencia",
+    portadaNota:   "Mejor con sonido.",
+
+    intro: [
+      "Una oficina postal, de noche. Afuera llueve.",
+      "Hay una caja cerrada a nombre de {N}.",
+      "Su contenido está protegido por una clave de {DIGITOS} dígitos.",
+      "El cartero que la custodiaba se fue de golpe y dejó pistas por toda la oficina.",
+      "Todo lo que necesitás está acá. Tenés que mirar bien."
+    ],
+
+    // Una carta después de cada sala (se muestran tras el segundo desafío).
+    cartas: [
+      "Hay cosas que no se pueden mandar por correo. Por eso las guardé acá, esperándote.",
+      "Cada sello de este registro marca un día en que no pude estar. Los guardé todos.<br><br><i>P. D.: según este mismo registro, hoy salió un regalo de cumpleaños hacia tu buzón. Del tuyo hacia el mío no consta ninguno. Queda anotado.</i>",
+      "Hay una frase que solo vos y yo entendemos. Es la llave de todo esto.",
+      "Casi llegás. Lo que sigue ya no está en esta oficina: está frente a vos."
+    ],
+
+    final: [
+      "Las cuatro pruebas están superadas.",
+      "El sello se rompe con esta clave:",
+      /* acá se muestra el código */
+      "La caja que tenés enfrente ya se puede abrir.",
+      "Todo lo que hay adentro es para vos.",
+      "(En el registro sigue anotado que el buzón de enfrente no mandó nada. Ya se cobrará.)",
+      "Feliz cumpleaños, {N}."
+    ]
+  }
+};
+
+// Validación mínima para evitar errores de configuración.
+(function () {
+  if (!/^[0-9]{1,4}$/.test(CONFIG.CODIGO)) {
+    console.warn("CONFIG.CODIGO debe ser de 1 a 4 números.");
+  }
+})();
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ //////////////////////////  UTILIDADES  ////////////////////////////
+ ////////////////////////////////////////////////////////////////////
+*/
+
+// Paleta (colores planos, sin degradados)
+const C = {
+  night:   "#1b2033",
+  night2:  "#232a42",
+  night3:  "#2c3552",
+  deep:    "#0f1424",
+  pink:    "#e8a0b4",
+  pinkDk:  "#c97b96",
+  pinkPl:  "#f4cfd9",
+  cream:   "#f3e9dc",
+  cream2:  "#d9c8ae",
+  amber:   "#e0a458",
+  amberDk: "#b9803a",
+  wood:    "#3b2d3c",
+  wood2:   "#4a3a4c",
+  wood3:   "#5a4660",
+  blue:    "#7a9ad6",
+  uv:      "#d6a8ff",
+  kraft:   "#c9a77c",
+  kraftDk: "#a8875c"
+};
+
+const SVGNS = "http://www.w3.org/2000/svg";
+
+// Crea un elemento HTML con clase y contenido
+function h(tag, cls, html) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html != null) e.innerHTML = html;
+  return e;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const mod   = (n, m) => ((n % m) + m) % m;
+
+// Reemplaza {N} y {DIGITOS} en los textos
+function fill(txt) {
+  const palabras = { 1: "un", 2: "dos", 3: "tres", 4: "cuatro" };
+  return txt
+    .replace(/\{N\}/g, CONFIG.NOMBRE)
+    .replace(/\{DIGITOS\}/g, palabras[CONFIG.CODIGO.length] || String(CONFIG.CODIGO.length));
+}
+
+// Convierte coordenadas de pantalla a coordenadas del viewBox de un <svg>
+function svgPoint(svg, clientX, clientY) {
+  const pt = svg.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  const m = svg.getScreenCTM();
+  return m ? pt.matrixTransform(m.inverse()) : { x: 0, y: 0 };
+}
+
+// Filtro de “trazo a mano”: deforma apenas los bordes para que no se vean
+// perfectamente rectos, como un dibujo hecho con tinta.
+const FILTRO_MANO =
+  '<defs><filter id="mano"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="n"/>' +
+  '<feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/></filter></defs>';
+
+// Crea un <svg> a partir de contenido interno (string)
+function makeSVG(inner, vb) {
+  const wrap = document.createElement("div");
+  wrap.className = "scene";
+  wrap.innerHTML =
+    '<svg xmlns="' + SVGNS + '" viewBox="' + (vb || "0 0 360 720") +
+    '" preserveAspectRatio="xMidYMid slice" role="img">' + FILTRO_MANO + inner + "</svg>";
+  return wrap;
+}
+
+////////////////////////////////////////////////////////////////////
+////////  DETALLES “HUMANOS” (manchas, anillos, vetas, etc.)  //////
+////////////////////////////////////////////////////////////////////
+function rng(seed) {
+  let s = (seed >>> 0) || 1;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+}
+// Mancha irregular
+function mancha(cx, cy, r, color, op, seed) {
+  const R = rng(seed), n = 10; let d = "";
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2, rr = r * (0.65 + R() * 0.7);
+    d += (i ? "L" : "M") + (cx + Math.cos(a) * rr).toFixed(1) + " " + (cy + Math.sin(a) * rr * 0.8).toFixed(1);
+  }
+  return '<path d="' + d + 'Z" fill="' + color + '" opacity="' + op + '"/>';
+}
+// Marca de taza (anillo incompleto)
+function anillo(cx, cy, rx, ry, color, op) {
+  const per = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+  return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="none" stroke="' + color +
+         '" stroke-width="2.2" opacity="' + op + '" stroke-dasharray="' + (per * 0.86).toFixed(0) + " " + per.toFixed(0) + '"/>';
+}
+// Vetas de madera / rayones: líneas finas de largo y posición irregulares
+function vetas(x, y, w, h, n, color, op, seed) {
+  const R = rng(seed); let s = "";
+  for (let i = 0; i < n; i++) {
+    const yy = y + (h / n) * i + R() * (h / n) * 0.8;
+    const x0 = x + R() * w * 0.5, x1 = x0 + w * (0.25 + R() * 0.5);
+    s += '<path d="M' + x0.toFixed(0) + " " + yy.toFixed(1) + " Q" + ((x0 + x1) / 2).toFixed(0) + " " + (yy + (R() - 0.5) * 3).toFixed(1) +
+         " " + Math.min(x1, x + w).toFixed(0) + " " + (yy + (R() - 0.5) * 2).toFixed(1) + '" fill="none" stroke="' + color + '" stroke-width="1" opacity="' + op + '"/>';
+  }
+  return s;
+}
+// Garabato que imita letra manuscrita
+function garabato(x, y, w, color, op, seed) {
+  const R = rng(seed); let d = "M" + x + " " + y, cx = x;
+  while (cx < x + w) {
+    const dx = 3 + R() * 4; cx += dx;
+    d += " q" + (dx / 2).toFixed(1) + " " + (-3 - R() * 3).toFixed(1) + " " + dx.toFixed(1) + " " + ((R() - 0.5) * 2).toFixed(1);
+  }
+  return '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="1.3" stroke-linecap="round" opacity="' + op + '"/>';
+}
+// Bombilla colgante con halo plano en escalones
+function bombilla(cx, yBulbo) {
+  return '<line x1="' + cx + '" y1="-20" x2="' + cx + '" y2="' + (yBulbo - 8) + '" stroke="' + C.night + '" stroke-width="2"/>' +
+         '<circle cx="' + cx + '" cy="' + yBulbo + '" r="72" fill="' + C.amber + '" opacity=".035"/>' +
+         '<circle cx="' + cx + '" cy="' + yBulbo + '" r="48" fill="' + C.amber + '" opacity=".05"/>' +
+         '<circle cx="' + cx + '" cy="' + yBulbo + '" r="28" fill="' + C.amber + '" opacity=".08"/>' +
+         '<rect x="' + (cx - 5) + '" y="' + (yBulbo - 12) + '" width="10" height="7" fill="' + C.night3 + '"/>' +
+         '<circle cx="' + cx + '" cy="' + yBulbo + '" r="7" fill="' + C.amber + '"/>';
+}
+
+// Máquina de escribir. Un toque en `skipTarget` completa el texto de golpe.
+function typeInto(el, text, speed, skipTarget) {
+  speed = speed || 26;
+  return new Promise((resolve) => {
+    let i = 0, done = false;
+    el.textContent = "";
+    const finish = () => {
+      if (done) return;
+      done = true;
+      el.textContent = text;
+      if (skipTarget) skipTarget.removeEventListener("pointerdown", finish);
+      resolve();
+    };
+    if (skipTarget) skipTarget.addEventListener("pointerdown", finish);
+    (function step() {
+      if (done) return;
+      i++;
+      el.textContent = text.slice(0, i);
+      if (i >= text.length) return finish();
+      setTimeout(step, speed);
+    })();
+  });
+}
+
+// Espera a que se toque cierto elemento (o cualquier parte de la pantalla)
+function waitTap(target) {
+  return new Promise((resolve) => {
+    const f = () => { target.removeEventListener("pointerdown", f); resolve(); };
+    target.addEventListener("pointerdown", f);
+  });
+}
+
+// Íconos (SVG de línea) usados en la interfaz
+const ICONOS = {
+  luna:     '<path d="M0 -14 A14 14 0 1 0 14 6 A11 11 0 1 1 0 -14 Z"/>',
+  estrella: '<path d="M0 -15 L4.4 -4.6 L15 -4.2 L6.8 2.6 L9.4 13 L0 7 L-9.4 13 L-6.8 2.6 L-15 -4.2 L-4.4 -4.6 Z"/>',
+  corazon:  '<path d="M0 12 C-18 0 -12 -14 0 -6 C12 -14 18 0 0 12 Z"/>',
+  llave:    '<circle cx="-7" cy="0" r="6" fill="none" stroke-width="3"/><path d="M-1 0 H14 M9 0 V6 M13 0 V5" fill="none" stroke-width="3" stroke-linecap="round"/>'
+};
+function simbolo(nombre, x, y, escala, color, extra) {
+  return '<g transform="translate(' + x + " " + y + ") scale(" + (escala || 1) + ')" fill="' + color +
+         '" stroke="' + color + '" ' + (extra || "") + ">" + ICONOS[nombre] + "</g>";
+}
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ //////////  AUDIO  (todo generado por código, sin archivos)  ///////
+ ////////////////////////////////////////////////////////////////////
+*/
+
+const Sonido = (function () {
+  let ctx = null, master, reverb, reverbSend, sfxBus, musicBus, rainBus;
+  let noiseBuf = null, musicOn = true, musicTimer = null, padA, padB, chordIdx = 0;
+  let rainFilter = null;
+
+  // Acordes (Am – F – C – G): raíz grave + notas para el arpegio
+  const ACORDES = [
+    { raiz: 110.00, notas: [220.00, 261.63, 329.63, 440.00, 523.25] },
+    { raiz:  87.31, notas: [174.61, 220.00, 261.63, 349.23, 440.00] },
+    { raiz: 130.81, notas: [261.63, 329.63, 392.00, 523.25, 659.25] },
+    { raiz:  98.00, notas: [196.00, 246.94, 293.66, 392.00, 493.88] }
+  ];
+
+  function init() {
+    if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+
+    master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+
+    // Reverb sencilla con un impulso de ruido que decae
+    reverb = ctx.createConvolver();
+    const len = Math.floor(ctx.sampleRate * 2.4);
+    const imp = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = imp.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    }
+    reverb.buffer = imp;
+    const revOut = ctx.createGain(); revOut.gain.value = 0.55;
+    reverb.connect(revOut); revOut.connect(master);
+    reverbSend = ctx.createGain(); reverbSend.gain.value = 1; reverbSend.connect(reverb);
+
+    sfxBus = ctx.createGain();   sfxBus.gain.value = 0.9;   sfxBus.connect(master);   sfxBus.connect(reverbSend);
+    musicBus = ctx.createGain(); musicBus.gain.value = 0.0; musicBus.connect(master); musicBus.connect(reverbSend);
+    rainBus = ctx.createGain();  rainBus.gain.value = 0.0;  rainBus.connect(master);
+
+    // Ruido blanco reutilizable
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+
+    startRain();
+    setMusic(musicOn);
+    document.addEventListener("visibilitychange", () => {
+      if (!ctx) return;
+      if (document.hidden) ctx.suspend(); else ctx.resume();
+    });
+  }
+
+  function noiseSource(loop) {
+    const s = ctx.createBufferSource();
+    s.buffer = noiseBuf; s.loop = !!loop;
+    return s;
+  }
+
+  // ---------- Lluvia ambiente ----------
+  function startRain() {
+    const n1 = noiseSource(true);
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 900;
+    rainFilter = ctx.createBiquadFilter(); rainFilter.type = "lowpass"; rainFilter.frequency.value = 5200;
+    const g1 = ctx.createGain(); g1.gain.value = 0.5;
+    n1.connect(hp); hp.connect(rainFilter); rainFilter.connect(g1); g1.connect(rainBus);
+    n1.start();
+
+    const n2 = noiseSource(true);
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420;
+    const g2 = ctx.createGain(); g2.gain.value = 0.55;
+    n2.connect(lp); lp.connect(g2); g2.connect(rainBus);
+    n2.start(ctx.currentTime, 0.7);
+
+    rainBus.gain.linearRampToValueAtTime(0.11, ctx.currentTime + 3);
+  }
+
+  // Más apagada adentro, más abierta en la portada
+  function setRainMuffle(abierta) {
+    if (!ctx || !rainFilter) return;
+    rainFilter.frequency.setTargetAtTime(abierta ? 5200 : 2300, ctx.currentTime, 0.6);
+  }
+
+  // ---------- Música generativa ----------
+  function nota(freq, t, dur, vol) {
+    const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain();
+    o1.type = "triangle"; o2.type = "sine";
+    o1.frequency.value = freq; o2.frequency.value = freq * 2.005;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o1.connect(g); o2.connect(g); g.connect(musicBus);
+    o1.start(t); o2.start(t); o1.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
+  }
+
+  function startMusic() {
+    if (musicTimer || !ctx) return;
+    padA = ctx.createOscillator(); padB = ctx.createOscillator();
+    const pg = ctx.createGain(); pg.gain.value = 0.05;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 520;
+    padA.type = "sine"; padB.type = "triangle";
+    padA.frequency.value = ACORDES[0].raiz; padB.frequency.value = ACORDES[0].raiz * 1.5;
+    padA.connect(pg); padB.connect(pg); pg.connect(lp); lp.connect(musicBus);
+    padA.start(); padB.start();
+
+    let tick = 0;
+    const loop = () => {
+      if (!musicOn) { musicTimer = null; return; }
+      const ac = ACORDES[chordIdx];
+      if (Math.random() < 0.82) {
+        const f = ac.notas[Math.floor(Math.random() * ac.notas.length)];
+        nota(f, ctx.currentTime + 0.05, 3.2, 0.07);
+      }
+      tick++;
+      if (tick % 6 === 0) {
+        chordIdx = (chordIdx + 1) % ACORDES.length;
+        const nx = ACORDES[chordIdx];
+        padA.frequency.setTargetAtTime(nx.raiz, ctx.currentTime, 1.2);
+        padB.frequency.setTargetAtTime(nx.raiz * 1.5, ctx.currentTime, 1.2);
+      }
+      musicTimer = setTimeout(loop, 1100 + Math.random() * 1300);
+    };
+    loop();
+  }
+
+  function setMusic(on) {
+    musicOn = !!on;
+    if (!ctx) return;
+    musicBus.gain.cancelScheduledValues(ctx.currentTime);
+    musicBus.gain.setTargetAtTime(musicOn ? 0.9 : 0.0, ctx.currentTime, 0.5);
+    if (musicOn) startMusic();
+  }
+
+  // ---------- Efectos ----------
+  function tono(freq, dur, tipo, vol, delay, slideTo) {
+    if (!ctx) return;
+    const t = ctx.currentTime + (delay || 0);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = tipo || "sine"; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol || 0.2, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(sfxBus);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function ruido(dur, tipoFiltro, freq, vol, delay, q) {
+    if (!ctx) return;
+    const t = ctx.currentTime + (delay || 0);
+    const s = noiseSource(false);
+    const f = ctx.createBiquadFilter(); f.type = tipoFiltro; f.frequency.value = freq; if (q) f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(sfxBus);
+    s.start(t, Math.random() * 1); s.stop(t + dur + 0.05);
+  }
+
+  const sfx = {
+    tap:    () => { tono(640, 0.06, "triangle", 0.14); },
+    papel:  () => { ruido(0.16, "bandpass", 3200, 0.22, 0, 0.8); },
+    cajon:  () => { ruido(0.45, "lowpass", 520, 0.35); tono(90, 0.25, "sine", 0.25, 0.3, 55); },
+    sello:  () => { tono(130, 0.22, "sine", 0.45, 0, 55); ruido(0.08, "bandpass", 1500, 0.3); },
+    candado:() => { tono(1900, 0.03, "square", 0.08); tono(1500, 0.04, "square", 0.08, 0.07); },
+    tick:   () => { tono(1300, 0.02, "square", 0.05); },
+    error:  () => { tono(190, 0.18, "sawtooth", 0.12); tono(150, 0.24, "sawtooth", 0.12, 0.14); },
+    hint:   () => { tono(880, 0.5, "sine", 0.1); tono(1318, 0.6, "sine", 0.08, 0.1); },
+    sube:   () => { tono(520, 0.3, "triangle", 0.1, 0, 780); },
+    chime: () => {
+      [784, 988, 1175, 1568].forEach((f, i) => tono(f, 1.6, "sine", 0.16, i * 0.12));
+    },
+    final: () => {
+      [392, 494, 587, 784, 988, 1175].forEach((f, i) => tono(f, 2.6, "sine", 0.13, i * 0.16));
+    },
+    puerta: () => { ruido(0.5, "lowpass", 380, 0.3); tono(70, 0.5, "sine", 0.3, 0.1, 50); },
+    voltear:() => { ruido(0.09, "bandpass", 2600, 0.18, 0, 0.9); tono(520, 0.05, "triangle", 0.06); },
+    par:    () => { tono(660, 0.35, "sine", 0.14); tono(880, 0.5, "sine", 0.12, 0.09); }
+  };
+
+  // ---------- Radio (estática que se aclara) ----------
+  function radio() {
+    if (!ctx) return { set() {}, stop() {} };
+    const src = noiseSource(true);
+    const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1800; bp.Q.value = 0.7;
+    const gN = ctx.createGain(); gN.gain.value = 0.16;
+    src.connect(bp); bp.connect(gN); gN.connect(sfxBus); src.start();
+
+    const whistle = ctx.createOscillator(); whistle.type = "sine"; whistle.frequency.value = 900;
+    const gW = ctx.createGain(); gW.gain.value = 0.0;
+    whistle.connect(gW); gW.connect(sfxBus); whistle.start();
+
+    const tonos = [220, 277.18, 329.63, 440].map((f) => {
+      const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f; return o;
+    });
+    const gT = ctx.createGain(); gT.gain.value = 0.0;
+    tonos.forEach((o) => { o.connect(gT); o.start(); });
+    gT.connect(sfxBus);
+
+    return {
+      set(c) { // c entre 0 y 1
+        const t = ctx.currentTime;
+        gN.gain.setTargetAtTime(0.17 * Math.pow(1 - c, 1.4), t, 0.08);
+        gW.gain.setTargetAtTime(0.03 * (1 - c) * (c > 0.05 ? 1 : 0.3), t, 0.08);
+        whistle.frequency.setTargetAtTime(500 + (1 - c) * 1400, t, 0.1);
+        gT.gain.setTargetAtTime(0.1 * Math.pow(c, 3), t, 0.12);
+      },
+      stop() {
+        const t = ctx.currentTime;
+        gN.gain.setTargetAtTime(0, t, 0.1); gW.gain.setTargetAtTime(0, t, 0.1); gT.gain.setTargetAtTime(0, t, 0.5);
+        setTimeout(() => {
+          try { src.stop(); whistle.stop(); tonos.forEach((o) => o.stop()); } catch (e) {}
+        }, 2500);
+      }
+    };
+  }
+
+  return {
+    init, setMusic, setRainMuffle, radio,
+    isMusicOn: () => musicOn,
+    nota: (f) => { try { if (ctx) { tono(f, 0.9, "sine", 0.22); tono(f * 2, 0.6, "triangle", 0.06); } } catch (e) {} },
+    play: (n) => { try { if (ctx && sfx[n]) sfx[n](); } catch (e) {} }
+  };
+})();
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ /////////  PROGRESO (se guarda en el teléfono, sobrevive a  ////////
+ /////////  recargas; si el navegador no deja, queda en memoria) ////
+ ////////////////////////////////////////////////////////////////////
+ Cada sala tiene 2 pasos. `pasos[i]` indica cuántos pasos de la sala i
+ ya están hechos mientras la sala todavía no está resuelta.
+ `pistas` tiene 8 casillas: sala*2 + paso.
+*/
+
+const State = (function () {
+  const KEY = "oficina-correspondencia-v2";
+  const nuevo = () => ({
+    iniciado: false,
+    resueltas: [false, false, false, false],
+    pasos: [0, 0, 0, 0],
+    terminado: false,
+    pistas: [0, 0, 0, 0, 0, 0, 0, 0]
+  });
+  let mem = null;
+
+  function leer() {
+    if (mem) return mem;
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+    const base = nuevo();
+    mem = Object.assign({}, base, d || {});
+    mem.resueltas = base.resueltas.map((v, i) => !!(mem.resueltas && mem.resueltas[i]));
+    mem.pasos     = base.pasos.map((v, i) => (mem.pasos && mem.pasos[i]) || 0);
+    mem.pistas    = base.pistas.map((v, i) => (mem.pistas && mem.pistas[i]) || 0);
+    return mem;
+  }
+  function guardar() {
+    try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (e) {}
+  }
+
+  return {
+    KEY,
+    get() { return leer(); },
+    set(k, v) { leer()[k] = v; guardar(); },
+    resolver(i) { leer().resueltas[i] = true; guardar(); },
+    paso(i) { return leer().pasos[i] || 0; },
+    setPaso(i, n) { leer().pasos[i] = n; guardar(); },
+    pista(clave, n) { leer().pistas[clave] = n; guardar(); },
+    // Primera sala sin resolver (4 si están todas)
+    salaActual() {
+      const r = leer().resueltas;
+      const i = r.indexOf(false);
+      return i === -1 ? 4 : i;
+    },
+    // Un dígito solo se considera "ganado" si su sala está resuelta
+    digitoGanado(i) { return leer().resueltas[i] && i < CONFIG.CODIGO.length; },
+    reset() { mem = nuevo(); guardar(); }
+  };
+})();
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ //////////////  INTERFAZ: HUD, TARJETAS, PISTAS, DÍGITOS  //////////
+ ////////////////////////////////////////////////////////////////////
+*/
+
+const UI = (function () {
+  let app, screen, hud, tray, btnHint, btnMusic, subtitle, cardLayer, hintLayer, digitLayer, titleLayer, fadeEl;
+  let subTimer = null;
+  const hintSt = { room: -1, list: [], used: 0, cdEnd: 0, timer: null };
+
+  const ICON_MUSIC =
+    '<svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.6"/><circle cx="16.5" cy="16" r="2.6"/><path class="x" d="M3 3L21 21" stroke-width="2"/></svg>';
+
+  // ---------------------------------------------------------------
+  function mount() {
+    app = document.getElementById("app");
+    screen = document.getElementById("screen");
+    hud = document.getElementById("hud");
+    tray = document.getElementById("tray");
+    btnHint = document.getElementById("btn-hint");
+    btnMusic = document.getElementById("btn-music");
+    subtitle = document.getElementById("subtitle");
+    cardLayer = document.getElementById("card-layer");
+    hintLayer = document.getElementById("hint-layer");
+    digitLayer = document.getElementById("digit-layer");
+    titleLayer = document.getElementById("title-layer");
+    fadeEl = document.getElementById("fade");
+
+    // Bandeja de dígitos (casillas vacías hasta ganarlos)
+    for (let i = 0; i < CONFIG.CODIGO.length; i++) {
+      const s = h("div", "slot"); s.dataset.i = i; tray.appendChild(s);
+    }
+    updateTray();
+
+    btnMusic.innerHTML = ICON_MUSIC;
+    btnMusic.addEventListener("click", () => {
+      const on = !Sonido.isMusicOn();
+      Sonido.setMusic(on);
+      refreshMusicBtn();
+      Sonido.play("tap");
+    });
+    refreshMusicBtn();
+    btnHint.addEventListener("click", onHintClick);
+  }
+
+  function refreshMusicBtn() {
+    btnMusic.classList.toggle("off", !Sonido.isMusicOn());
+    btnMusic.querySelector(".x").style.display = Sonido.isMusicOn() ? "none" : "";
+  }
+
+  // ---------------------------------------------------------------
+  // Escenas
+  function showScene(node) {
+    cam = null; fallos = 0;
+    node.classList.add("enter");
+    screen.innerHTML = "";
+    screen.appendChild(node);
+  }
+  function clearScene() { screen.innerHTML = ""; }
+
+  function bars(on) { app.classList.toggle("bars-on", !!on); }
+  function hudShow(on) { hud.classList.toggle("hidden", !on); }
+
+  function fade(on, ms) {
+    fadeEl.style.transitionDuration = (ms || 900) + "ms";
+    fadeEl.classList.toggle("on", !!on);
+    return sleep((ms || 900) + 60);
+  }
+
+  // Subtítulo cinematográfico
+  function say(text, ms) {
+    subtitle.textContent = text;
+    subtitle.classList.add("on");
+    clearTimeout(subTimer);
+    // Tiempo de lectura: nunca menos de ~2.6 s y crece con el largo del texto
+    const dur = Math.max((ms || 4600) * 1.35, 2600 + text.length * 80);
+    subTimer = setTimeout(() => subtitle.classList.remove("on"), dur);
+  }
+  function hush() { clearTimeout(subTimer); subtitle.classList.remove("on"); }
+
+  // Tarjeta de título entre salas
+  // `medio` se ejecuta con la pantalla en negro (ahí se cambia la escena de fondo)
+  async function titleCard(kicker, title, medio) {
+    titleLayer.innerHTML = '<div class="k"></div><div class="l"></div><div class="t"></div>';
+    titleLayer.querySelector(".k").textContent = kicker;
+    titleLayer.querySelector(".t").textContent = title;
+    titleLayer.classList.add("on");
+    await sleep(1300);
+    if (medio) medio();
+    await sleep(3000);
+    titleLayer.classList.remove("on");
+    await sleep(1100);
+  }
+
+  // ---------------------------------------------------------------
+  // Tarjeta para examinar objetos
+  function card(title, bodyHtml, espera) {
+    return new Promise((resolve) => {
+      cardLayer.innerHTML =
+        '<div class="backdrop"></div><div class="sheet paper"><div class="kick"></div><p></p>' +
+        '<div class="row"><button class="btn small">Cerrar</button></div></div>';
+      cardLayer.querySelector(".kick").textContent = title;
+      cardLayer.querySelector("p").innerHTML = bodyHtml;
+      const hoja = cardLayer.querySelector(".sheet");
+      hoja.style.clipPath = rasgado(14, 7, 4);
+      hoja.style.setProperty("--rot", (Math.random() * 1.6 - 0.8).toFixed(2) + "deg");
+      requestAnimationFrame(() => requestAnimationFrame(() => cardLayer.classList.add("on")));
+      Sonido.play("papel");
+      let closed = false;
+      // Lectura obligatoria: el botón se habilita pasado un tiempo (solo si se pide)
+      const t0 = Date.now(), btn = cardLayer.querySelector("button");
+      if (espera) {
+        btn.disabled = true; btn.style.opacity = ".35";
+        const iv = setInterval(() => {
+          if (Date.now() - t0 >= espera) { clearInterval(iv); btn.disabled = false; btn.style.opacity = ""; }
+        }, 200);
+      }
+      const close = () => {
+        if (closed || (espera && Date.now() - t0 < espera)) return; closed = true;
+        cardLayer.classList.remove("on");
+        setTimeout(() => { cardLayer.innerHTML = ""; resolve(); }, 450);
+      };
+      cardLayer.querySelector("button").addEventListener("click", close);
+      cardLayer.querySelector(".backdrop").addEventListener("pointerdown", close);
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Bandeja de dígitos
+  function updateTray(popIndex) {
+    tray.querySelectorAll(".slot").forEach((s) => {
+      const i = +s.dataset.i;
+      const gana = State.digitoGanado(i);
+      s.classList.toggle("on", gana);
+      s.textContent = gana ? CONFIG.CODIGO[i] : "";
+      if (popIndex === i) { s.classList.remove("pop"); void s.offsetWidth; s.classList.add("pop"); }
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Sistema de pistas (3 niveles, con espera)
+  function setupHints(room, list) {
+    stopHints();
+    hintSt.room = room; hintSt.list = list;
+    hintSt.used = State.get().pistas[room] || 0;
+    hintSt.cdEnd = Date.now() + (hintSt.used ? 10000 : 28000);
+    hintSt.timer = setInterval(refreshHint, 500);
+    refreshHint();
+  }
+  function stopHints() {
+    clearInterval(hintSt.timer); hintSt.timer = null;
+    hintLayer.classList.remove("on"); hintLayer.innerHTML = "";
+  }
+  function refreshHint() {
+    const left = Math.max(0, Math.ceil((hintSt.cdEnd - Date.now()) / 1000));
+    const agotadas = hintSt.used >= hintSt.list.length;
+    const lista = !agotadas && left === 0;
+    btnHint.classList.toggle("ready", lista);
+    if (agotadas) btnHint.textContent = "Pistas";
+    else if (left > 0) btnHint.textContent = hintSt.used ? "Pistas · " + left : "Pista · " + left;
+    else btnHint.textContent = "Pista";
+  }
+  function onHintClick() {
+    const left = Math.max(0, Math.ceil((hintSt.cdEnd - Date.now()) / 1000));
+    const agotadas = hintSt.used >= hintSt.list.length;
+    if (hintSt.used > 0 && (left > 0 || agotadas)) return openHints(false);
+    if (hintSt.used === 0 && left > 0) {
+      Sonido.play("tap");
+      return say("Todavía no. Mirá un poco más antes de pedir ayuda.", 3200);
+    }
+    // Entrega una pista nueva
+    hintSt.used++;
+    State.pista(hintSt.room, hintSt.used);
+    hintSt.cdEnd = Date.now() + 22000;
+    refreshHint();
+    openHints(true);
+  }
+  function openHints(esNueva) {
+    let html = '<div class="backdrop"></div><div class="sheet hints"><div class="kick">Pistas</div>';
+    for (let i = 0; i < hintSt.used; i++) {
+      const nueva = esNueva && i === hintSt.used - 1;
+      html += '<div class="pista' + (nueva ? " new" : "") + '"><b>Pista ' + (i + 1) + "</b>" + hintSt.list[i] + "</div>";
+    }
+    html += '<div class="row"><button class="btn small">Entendido</button></div></div>';
+    hintLayer.innerHTML = html;
+    requestAnimationFrame(() => requestAnimationFrame(() => hintLayer.classList.add("on")));
+    Sonido.play("hint");
+    let cerrado = false;
+    const close = () => {
+      if (cerrado) return; cerrado = true;
+      hintLayer.classList.remove("on");
+      setTimeout(() => { hintLayer.innerHTML = ""; }, 450);
+    };
+    hintLayer.querySelector("button").addEventListener("click", close);
+    hintLayer.querySelector(".backdrop").addEventListener("pointerdown", close);
+  }
+
+  // ---------------------------------------------------------------
+  // Revelación de un dígito (etiqueta que cae sobre la pantalla)
+  function revealDigit(i, digito, foto) {
+    return new Promise((resolve) => {
+      // Polaroid: primero el dibujo de reemplazo; si la foto existe, la reemplaza
+      let poli = "";
+      if (foto !== undefined) poli = '<div class="polaroid"><div class="ph">' + marcoFoto() + "</div></div>";
+      digitLayer.innerHTML =
+        '<div class="bg"></div><div class="center">' + poli +
+        '<div class="tag"><div class="lab">Dígito ' + (i + 1) + " de " + CONFIG.CODIGO.length +
+        '</div><div class="num">' + digito + "</div></div>" +
+        '<button class="btn">Guardar</button></div>';
+      if (foto !== undefined) {
+        const img = new Image();
+        img.alt = "";
+        img.onload = () => {
+          const ph = digitLayer.querySelector(".polaroid .ph");
+          if (ph) { ph.innerHTML = ""; ph.appendChild(img); }
+        };
+        img.src = foto;   // si no existe, queda el dibujo de reemplazo
+      }
+      const etq = digitLayer.querySelector(".tag");
+      etq.style.clipPath = rasgado(10, 6, 5);
+      etq.style.setProperty("--rot", (Math.random() * 3 + 1).toFixed(1) + "deg");
+      const pol = digitLayer.querySelector(".polaroid");
+      if (pol) pol.style.setProperty("--rot", (-2 - Math.random() * 3).toFixed(1) + "deg");
+      digitLayer.classList.add("on");
+      requestAnimationFrame(() => requestAnimationFrame(() => digitLayer.classList.add("in")));
+      setTimeout(() => Sonido.play("candado"), 1100);
+      let hecho = false;
+      digitLayer.querySelector("button").addEventListener("click", () => {
+        if (hecho) return; hecho = true;
+        Sonido.play("tap");
+        digitLayer.classList.remove("in");
+        digitLayer.classList.remove("on");
+        updateTray(i);
+        setTimeout(() => { digitLayer.innerHTML = ""; resolve(); }, 700);
+      });
+    });
+  }
+
+  // Dibujo de reemplazo cuando todavía no hay foto
+  function marcoFoto() {
+    return (
+      '<svg viewBox="0 0 100 100" style="width:100%;height:100%;display:block">' +
+      '<rect width="100" height="100" fill="' + C.night3 + '"/>' +
+      '<circle cx="68" cy="34" r="12" fill="' + C.pinkPl + '"/>' +
+      '<circle cx="73" cy="31" r="11" fill="' + C.night3 + '"/>' +
+      '<path d="M0 78 L28 52 L46 68 L64 48 L100 80 V100 H0 Z" fill="' + C.night + '"/>' +
+      "</svg>"
+    );
+  }
+
+  // ===============================================================
+  // INTENTOS: el primer error es gratis; desde el segundo el mecanismo
+  // se traba y hay que esperar (10 s, 20 s, 30 s... hasta 45 s).
+  // Así no se puede ganar probando combinaciones a lo loco.
+  // ===============================================================
+  let fallos = 0;
+  async function penalizar() {
+    fallos++;
+    if (fallos < 2) return;
+    const seg = Math.min(45, (fallos - 1) * 10);
+    const capa = h("div", "lockout",
+      '<div class="lk-t">El mecanismo se trabó</div><div class="lk-n"></div><div class="lk-s">Mirá bien las pistas antes de volver a probar.</div>');
+    app.appendChild(capa);
+    const n = capa.querySelector(".lk-n");
+    for (let r = seg; r > 0; r--) { n.textContent = r; await sleep(1000); }
+    capa.remove();
+  }
+
+  // ===============================================================
+  // CINE: zoom de cámara y carta que sale de un cajón
+  // ===============================================================
+  const escenaSVG = () => screen.querySelector("svg");
+
+  // Polígono de borde rasgado (para clip-path en %)
+  function rasgado(n, alto, bajo) {
+    const arriba = [], abajo = [];
+    for (let i = 0; i <= n; i++) {
+      const x = (i / n) * 100;
+      arriba.push(x.toFixed(1) + "% " + (Math.random() * alto).toFixed(1) + "px");
+    }
+    for (let i = n; i >= 0; i--) {
+      const x = (i / n) * 100;
+      abajo.push(x.toFixed(1) + "% calc(100% - " + (Math.random() * bajo).toFixed(1) + "px)");
+    }
+    return "polygon(" + arriba.concat(abajo).join(",") + ")";
+  }
+
+  // Animación por cuadros (requestAnimationFrame): más estable en celulares
+  // que las transiciones CSS sobre elementos SVG.
+  const suave = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const salida = (t) => 1 - Math.pow(1 - t, 3);
+  function anim(ms, paso, curva) {
+    return new Promise((res) => {
+      const t0 = performance.now();
+      (function f(ahora) {
+        const t = Math.min(1, (ahora - t0) / ms);
+        paso((curva || suave)(t));
+        if (t < 1) requestAnimationFrame(f); else res();
+      })(t0);
+    });
+  }
+  const mezcla = (a, b, t) => a + (b - a) * t;
+
+  // --- Cámara: se anima el viewBox (el dibujo se re-renderiza nítido) ---
+  let cam = null;
+  function visible(svg) {
+    const r = svg.getBoundingClientRect();
+    const vb = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+    const s = Math.max(r.width / vb[2], r.height / vb[3]);
+    const w = r.width / s, h = r.height / s;
+    return { orig: vb, vb: [vb[0] + vb[2] / 2 - w / 2, vb[1] + vb[3] / 2 - h / 2, w, h] };
+  }
+  // Los filtros de “trazo a mano” son pesados al moverse: se quitan al empezar el zoom
+  function sinFiltros(svg) {
+    svg.querySelectorAll("[filter]").forEach((e) => e.removeAttribute("filter"));
+  }
+  async function zoomA(x, y, escala, ms, yPantalla) {
+    const svg = escenaSVG(); if (!svg) return;
+    sinFiltros(svg);
+    if (!cam) {
+      const v = visible(svg);
+      cam = { orig: v.orig.join(" "), cur: v.vb };
+      svg.setAttribute("viewBox", cam.cur.join(" "));
+    }
+    const a = cam.cur.slice(), w = a[2] / escala, h = a[3] / escala;
+    const b = [x - w / 2, y - h * (yPantalla || 0.48), w, h];
+    await anim(ms || 1500, (t) => {
+      cam.cur = a.map((v, i) => mezcla(v, b[i], t));
+      svg.setAttribute("viewBox", cam.cur.join(" "));
+    });
+  }
+  async function zoomFuera(ms) {
+    const svg = escenaSVG(); if (!svg || !cam) return;
+    const a = cam.cur.slice(), o = cam.orig.split(" ").map(Number), vis = (function () {
+      svg.setAttribute("viewBox", cam.orig); const v = visible(svg); svg.setAttribute("viewBox", a.join(" ")); return v.vb;
+    })();
+    await anim(ms || 1200, (t) => {
+      cam.cur = a.map((v, i) => mezcla(v, vis[i], t));
+      svg.setAttribute("viewBox", cam.cur.join(" "));
+    });
+    svg.setAttribute("viewBox", cam.orig); cam = null;
+  }
+  // Se llama al cambiar de escena: la cámara vuelve a empezar
+  function camReset() { cam = null; }
+
+  // Mueve un elemento SVG hacia abajo (dy) y lo desvanece, por cuadros
+  function mover(el, dy, ms, opFin, curva) {
+    const dy0 = el._dy || 0;
+    return anim(ms, (t) => {
+      const d = mezcla(dy0, dy, t); el._dy = d;
+      el.setAttribute("transform", "translate(0 " + d.toFixed(2) + ")");
+      if (opFin !== undefined) el.setAttribute("opacity", mezcla(el._op == null ? 1 : el._op, opFin, t));
+    }, curva || salida).then(() => { if (opFin !== undefined) el._op = opFin; });
+  }
+
+  // Un sobre sube desde (x, y) del dibujo: sale del cajón y se acomoda a la vista
+  async function emerger(x, y) {
+    const svg = escenaSVG(); if (!svg) return;
+    const g = document.createElementNS(SVGNS, "g");
+    g.setAttribute("pointer-events", "none"); g.setAttribute("opacity", "0");
+    g.innerHTML = sobreDibujo();
+    svg.appendChild(g);
+    const pone = (dx, dy, rot, esc) =>
+      g.setAttribute("transform", "translate(" + (x + dx).toFixed(1) + " " + (y + dy).toFixed(1) + ") rotate(" + rot.toFixed(2) + ") scale(" + esc.toFixed(3) + ") translate(-38 -25)");
+    pone(0, 6, 0, 0.8);
+    Sonido.play("papel");
+    await anim(1800, (t) => { g.setAttribute("opacity", Math.min(1, t * 3)); pone(0, mezcla(6, -42, t), mezcla(0, -5, t), mezcla(0.8, 1, t)); }, salida);
+    await sleep(250);
+    await anim(1300, (t) => pone(0, mezcla(-42, -78, t), mezcla(-5, 3, t), mezcla(1, 1.2, t)), salida);
+    await sleep(500);
+  }
+
+  // Una carta sube desde abajo, crece y se centra (fin del segundo desafío)
+  async function cartaSube() {
+    const svg = escenaSVG(); if (!svg) return;
+    const v = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+    const cx = v[0] + v[2] / 2, cy = v[1] + v[3] * 0.46, esc = v[2] / 150;
+    const g = document.createElementNS(SVGNS, "g");
+    g.setAttribute("pointer-events", "none"); g.setAttribute("opacity", "0");
+    g.innerHTML = sobreDibujo();
+    svg.appendChild(g);
+    const pone = (y, rot, e) =>
+      g.setAttribute("transform", "translate(" + cx.toFixed(1) + " " + y.toFixed(1) + ") rotate(" + rot.toFixed(2) + ") scale(" + e.toFixed(3) + ") translate(-38 -25)");
+    const y0 = v[1] + v[3] + 40;
+    pone(y0, -8, esc * 0.6);
+    Sonido.play("papel");
+    await anim(2300, (t) => { g.setAttribute("opacity", Math.min(1, t * 4)); pone(mezcla(y0, cy, t), mezcla(-8, -3, t), mezcla(esc * 0.6, esc, t)); }, salida);
+    await sleep(700);
+  }
+
+  // Sobre aéreo: borde de rayas, sello y matasellos, dirección a mano. Un poco gastado.
+  function sobreDibujo() {
+    let rayas = "";
+    for (let i = 0; i < 9; i++) {
+      const x = 3 + i * 8.2, c = i % 2 ? C.blue : C.pink;
+      rayas += '<path d="M' + x + " 1.5 h6 l-2.6 3.6 h-6 Z" + '" fill="' + c + '"/>' +
+               '<path d="M' + (x + 2.6) + " 48.5 h6 l-2.6 -3.6 h-6 Z" + '" fill="' + c + '"/>';
+    }
+    return '<path d="M0 2 L75 0 L76.5 49 L1.5 51 Z" fill="' + C.cream + '" stroke="' + C.cream2 + '" stroke-width="1"/>' +
+      rayas +
+      '<path d="M0 2 L75 0" stroke="' + C.night + '" stroke-width=".4" opacity=".25"/>' +
+      // sello postal con borde dentado
+      '<rect x="55" y="9" width="14" height="17" fill="' + C.pinkPl + '" stroke="' + C.cream + '" stroke-width="1.6" stroke-dasharray="1.4 1.4"/>' +
+      '<path d="M62 22 C55 17 58 12 62 15 C66 12 69 17 62 22 Z" fill="' + C.pinkDk + '"/>' +
+      // matasellos
+      '<circle cx="50" cy="19" r="6.5" fill="none" stroke="' + C.night + '" stroke-width=".7" opacity=".5"/>' +
+      '<path d="M36 15 q4 -2 8 0 t8 0 M36 19 q4 -2 8 0 t8 0 M36 23 q4 -2 8 0 t8 0" fill="none" stroke="' + C.night + '" stroke-width=".7" opacity=".45"/>' +
+      // dirección escrita a mano
+      garabato(9, 30, 38, C.night, 0.7, 11) + garabato(9, 35.5, 30, C.night, 0.6, 12) + garabato(9, 41, 22, C.night, 0.55, 13) +
+      // desgaste
+      mancha(63, 40, 5, C.kraftDk, 0.25, 8) + '<path d="M70 50 l6 -7 v7 Z" fill="' + C.cream2 + '"/>';
+  }
+
+  // Pequeña sacudida (respuesta a un error)
+  function shake(el) {
+    if (!el) return;
+    el.classList.remove("shake"); void el.getBoundingClientRect(); el.classList.add("shake");
+    setTimeout(() => el.classList.remove("shake"), 500);
+  }
+
+  return {
+    mount, showScene, clearScene, bars, hudShow, fade, say, hush, titleCard, card,
+    zoomA, zoomFuera, camReset, mover, emerger, cartaSube, penalizar,
+    updateTray, setupHints, stopHints, revealDigit, shake,
+    get app() { return app; }
+  };
+})();
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ ////////////  SALA 1 · EL ESCRITORIO DEL CARTERO (UV)  /////////////
+ ////////////////////////////////////////////////////////////////////
+ Mecánica: una luz UV (círculo) se arrastra con el dedo y revela símbolos
+ escondidos en la lámpara, la taza y la bolsa. La nota de la pared dice el
+ orden de entrega. En el cajón hay que tocar los símbolos en ese orden.
+ Solución: luna (lámpara) → estrella (taza) → corazón (bolsa)
+*/
+
+const Sala1 = {
+  id: 0,
+  kicker: "Sala 1",
+  titulo: "El escritorio del cartero",
+  pistas: [
+    "No todo se ve con luz normal. Pasá la luz UV por los objetos del escritorio.",
+    "Hay símbolos escondidos en la lámpara, la taza y la bolsa. La nota de la pared dice en qué orden usarlos.",
+    "El orden es: lo que alumbra, lo que se bebe, lo que se come. En el cajón tocá luna, estrella y corazón, en ese orden."
+  ],
+  SOLUCION: ["luna", "estrella", "corazon"],
+
+  construir() {
+    const R = 56; // radio de la luz UV
+
+    // ---------- Dibujo de la escena ----------
+    let svg = "";
+
+    // Defs: máscara de oscurecimiento y recorte de la luz
+    svg += '<defs>' +
+      '<clipPath id="s1clip"><circle id="s1clipc" cx="180" cy="430" r="' + R + '"/></clipPath>' +
+      '<mask id="s1mask"><rect x="-80" y="-20" width="520" height="780" fill="white"/><circle id="s1maskc" cx="180" cy="430" r="' + R + '" fill="black"/></mask>' +
+      '</defs>';
+
+    // Pared + papel tapiz
+    svg += '<g filter="url(#mano)">' +
+      '<rect x="-80" y="-20" width="520" height="780" fill="' + C.night2 + '"/>';
+    for (let x = -60; x < 420; x += 30) svg += '<rect x="' + x + '" y="-20" width="2" height="520" fill="#283050"/>';
+    svg += '<rect x="-80" y="318" width="520" height="6" fill="' + C.night3 + '"/>' +
+      mancha(292, 236, 26, C.night3, 0.3, 17) + mancha(52, 392, 28, C.night3, 0.3, 5) + mancha(210, 300, 22, C.night3, 0.25, 8) +
+      vetas(-40, 40, 440, 50, 3, C.night3, 0.5, 4) +
+      "</g>" + bombilla(180, 70);
+
+    // Ventana con lluvia
+    svg += '<g id="s1window" class="tappable">' +
+      '<rect x="102" y="96" width="156" height="178" rx="3" fill="' + C.cream2 + '"/>' +
+      '<rect x="110" y="104" width="140" height="162" fill="' + C.deep + '"/>' +
+      // ciudad lejana
+      '<g fill="#1a2140"><rect x="110" y="226" width="22" height="40"/><rect x="134" y="210" width="26" height="56"/><rect x="162" y="232" width="18" height="34"/><rect x="182" y="218" width="30" height="48"/><rect x="214" y="236" width="36" height="30"/></g>' +
+      '<g fill="' + C.amber + '" opacity=".75"><rect x="140" y="220" width="4" height="4"/><rect x="148" y="232" width="4" height="4"/><rect x="190" y="228" width="4" height="4"/><rect x="200" y="240" width="4" height="4"/><rect x="224" y="246" width="4" height="4"/></g>' +
+      // luna
+      '<circle cx="222" cy="134" r="11" fill="' + C.pinkPl + '"/><circle cx="227" cy="131" r="10" fill="' + C.deep + '"/>' +
+      // lluvia
+      '<svg x="110" y="104" width="140" height="162" viewBox="0 0 140 162" overflow="hidden"><g class="rain">';
+    for (let i = 0; i < 16; i++) {
+      const x = 6 + i * 8.6, d = (0.55 + (i % 5) * 0.12).toFixed(2), dl = (-(i * 0.17)).toFixed(2);
+      svg += '<line x1="' + x + '" y1="-30" x2="' + (x - 2) + '" y2="-18" style="animation-duration:' + d + "s;animation-delay:" + dl + 's"/>';
+    }
+    svg += '</g></svg>' +
+      '<rect x="178" y="104" width="4" height="162" fill="' + C.cream2 + '"/><rect x="110" y="182" width="140" height="4" fill="' + C.cream2 + '"/>' +
+      '</g>';
+
+    // Calendario
+    svg += '<g id="s1cal" class="tappable" filter="url(#mano)">' +
+      '<rect x="26" y="112" width="62" height="80" rx="2" fill="' + C.cream + '"/>' +
+      '<rect x="26" y="112" width="62" height="20" rx="2" fill="' + C.pink + '"/>' +
+      '<text x="57" y="127" text-anchor="middle" font-size="11" letter-spacing="2" fill="' + C.night + '">NOV</text>' +
+      '<text x="57" y="170" text-anchor="middle" font-size="30" font-weight="bold" fill="' + C.night + '">28</text>' +
+      '<ellipse cx="57" cy="161" rx="22" ry="17" fill="none" stroke="' + C.pinkDk + '" stroke-width="2.4" transform="rotate(-8 57 161)"/>' +
+      '<circle cx="57" cy="108" r="3" fill="' + C.cream2 + '"/>' +
+      '</g>';
+
+    // Nota pegada
+    svg += '<g id="s1note" class="tappable" filter="url(#mano)">' +
+      '<g transform="rotate(4 300 150)"><rect x="272" y="116" width="58" height="68" fill="' + C.cream + '"/>' +
+      '<rect x="288" y="108" width="26" height="12" fill="' + C.pinkPl + '" opacity=".85"/>' +
+      '<g fill="' + C.night3 + '"><rect x="280" y="134" width="40" height="2"/><rect x="280" y="144" width="34" height="2"/><rect x="280" y="154" width="40" height="2"/><rect x="280" y="164" width="26" height="2"/></g></g>' +
+      '</g>';
+
+    // Estante con libros
+    const libros = [[28,262,16,56,C.pink],[46,272,14,46,C.cream2],[62,258,18,60,C.blue],[82,270,12,48,C.amber],[96,264,16,54,C.pinkDk]];
+    svg += '<g filter="url(#mano)">';
+    libros.forEach((b) => { svg += '<rect x="' + b[0] + '" y="' + b[1] + '" width="' + b[2] + '" height="' + b[3] + '" fill="' + b[4] + '"/>'; });
+    svg += '<rect x="280" y="288" width="34" height="30" rx="3" fill="' + C.wood3 + '"/>' +
+      '<path d="M297 288 C285 270 282 258 288 246 C296 258 298 270 297 288 Z" fill="#5f8a78"/>' +
+      '<path d="M297 288 C306 272 314 264 322 262 C318 274 308 284 297 288 Z" fill="#7aa592"/>' + "</g>";
+
+    // Escritorio
+    svg += '<g filter="url(#mano)"><rect x="-80" y="470" width="520" height="30" fill="' + C.wood3 + '"/>' +
+      '<rect x="-80" y="470" width="520" height="4" fill="' + C.wood3 + '" opacity=".6"/>' +
+      '<rect x="-80" y="500" width="520" height="260" fill="' + C.wood + '"/>' +
+      '<rect x="-80" y="500" width="520" height="5" fill="' + C.wood2 + '"/>' +
+      vetas(-60, 474, 500, 22, 6, "#2b2030", 0.4, 11) + vetas(-60, 508, 500, 200, 10, "#2a2030", 0.35, 12) +
+      anillo(124, 487, 15, 4, C.kraftDk, 0.55) +
+      '<polygon points="94,480 140,477 146,491 99,494" fill="' + C.cream + '" opacity=".9"/>' +
+      '<path d="M101 484 q10 -3 20 0 M101 488 q12 -3 24 0" fill="none" stroke="' + C.night3 + '" stroke-width="1" opacity=".6"/>' +
+      '<line x1="212" y1="489" x2="266" y2="483" stroke="' + C.amber + '" stroke-width="4" stroke-linecap="round"/>' +
+      '<polygon points="266,481 274,482 266,485" fill="' + C.cream2 + '"/>' +
+      "</g>";
+
+    // Luz de la lámpara sobre el escritorio (plano translúcido)
+    svg += '<polygon points="76,392 136,392 206,470 22,470" fill="' + C.amber + '" opacity=".13"/>';
+
+    // Lámpara
+    svg += '<g id="s1lamp" class="tappable" filter="url(#mano)">' +
+      '<ellipse cx="62" cy="468" rx="26" ry="6" fill="' + C.night3 + '"/>' +
+      '<rect x="56" y="440" width="12" height="28" fill="' + C.night3 + '"/>' +
+      '<polyline points="62,440 62,404 98,376" fill="none" stroke="' + C.night3 + '" stroke-width="5" stroke-linejoin="round"/>' +
+      '<polygon points="80,350 128,366 118,396 70,380" fill="' + C.amber + '"/>' +
+      '<polygon points="70,380 118,396 116,402 68,386" fill="' + C.amberDk + '"/>' +
+      '</g>';
+
+    // Taza
+    svg += '<g id="s1cup" class="tappable" filter="url(#mano)">' +
+      '<ellipse cx="186" cy="470" rx="30" ry="6" fill="' + C.cream2 + '"/>' +
+      '<path d="M166 436 H206 V454 Q206 470 186 470 Q166 470 166 454 Z" fill="' + C.cream + '"/>' +
+      '<rect x="166" y="442" width="40" height="6" fill="' + C.pink + '"/>' +
+      '<path d="M206 442 q16 0 16 12 q0 12 -16 12" fill="none" stroke="' + C.cream + '" stroke-width="4"/>' +
+      '<g class="steam" fill="none" stroke="' + C.cream2 + '" stroke-width="2" stroke-linecap="round"><path d="M180 430 q-6 -8 0 -16"/><path d="M192 428 q6 -8 0 -16"/></g>' +
+      '</g>';
+
+    // Bolsa de papel
+    svg += '<g id="s1bag" class="tappable" filter="url(#mano)">' +
+      '<rect x="234" y="410" width="60" height="60" fill="' + C.kraft + '"/>' +
+      '<polygon points="294,410 306,418 306,470 294,470" fill="' + C.kraftDk + '"/>' +
+      '<polygon points="234,410 240,402 288,402 294,410" fill="' + C.kraftDk + '"/>' +
+      '<rect x="242" y="420" width="44" height="26" fill="' + C.cream + '"/>' +
+      '<text x="264" y="431" text-anchor="middle" font-size="7.5" font-weight="bold" fill="' + C.night + '">LOMITO</text>' +
+      '<text x="264" y="441" text-anchor="middle" font-size="7.5" font-weight="bold" fill="' + C.pinkDk + '">ÁRABE</text>' +
+      '</g>';
+
+    // Paquete sellado
+    svg += '<g id="s1parcel" class="tappable" filter="url(#mano)">' +
+      '<rect x="312" y="430" width="40" height="40" fill="' + C.kraft + '"/>' +
+      '<rect x="329" y="430" width="6" height="40" fill="' + C.pink + '"/><rect x="312" y="446" width="40" height="6" fill="' + C.pink + '"/>' +
+      '<rect x="316" y="456" width="26" height="12" fill="' + C.cream + '"/>' +
+      '<text x="329" y="465" text-anchor="middle" font-size="6.5" font-weight="bold" fill="' + C.night + '">SOFÍA</text>' +
+      '</g>';
+
+    // Frente del escritorio con cajón
+    svg += '<g id="s1drawer">' +
+      '<rect x="46" y="536" width="268" height="140" rx="5" fill="#2a2030"/>' +
+      '<g id="s1face">' +
+      '<rect x="46" y="536" width="268" height="140" rx="5" fill="' + C.wood2 + '" stroke="#2e2230" stroke-width="2"/>' +
+      '<rect x="150" y="548" width="60" height="7" rx="3.5" fill="' + C.cream2 + '"/>';
+    // Cuatro botones con símbolos (orden mezclado)
+    const botones = [["corazon", 92], ["luna", 150], ["llave", 210], ["estrella", 268]];
+    botones.forEach((b) => {
+      svg += '<g class="tappable s1btn" data-sym="' + b[0] + '">' +
+        '<circle class="s1btnbg" cx="' + b[1] + '" cy="612" r="23" fill="' + C.night3 + '" stroke="' + C.cream2 + '" stroke-width="1.5"/>' +
+        simbolo(b[0], b[1], 612, 0.9, C.cream, 'class="s1btnsym" stroke-width="0.6"') +
+        "</g>";
+    });
+    svg += '</g></g>';
+
+    // Capa de oscurecimiento con agujero para la luz
+    svg += '<rect id="s1dim" x="-80" y="-20" width="520" height="780" fill="' + C.deep + '" opacity=".30" mask="url(#s1mask)" pointer-events="none"/>';
+
+    // Marcas ocultas, visibles solo dentro de la luz
+    svg += '<g id="s1uv" clip-path="url(#s1clip)" pointer-events="none">' +
+      '<rect x="-80" y="-20" width="520" height="780" fill="' + C.uv + '" opacity=".16"/>' +
+      simbolo("luna",     100, 372, 0.95, C.uv, 'stroke-width="0"') +
+      simbolo("estrella", 186, 456, 0.78, C.uv, 'stroke-width="0"') +
+      simbolo("corazon",  264, 458, 0.62, C.uv, 'stroke-width="0"') +
+      simbolo("llave",    330, 440, 0.55, C.uv, 'stroke-width="0.6"') +
+      '</g>';
+
+    // Anillo de la luz
+    svg += '<g id="s1lens" pointer-events="none">' +
+      '<circle id="s1ring" cx="180" cy="430" r="' + R + '" fill="none" stroke="' + C.uv + '" stroke-width="2"/>' +
+      '<circle id="s1ring2" cx="180" cy="430" r="' + (R + 7) + '" fill="none" stroke="' + C.uv + '" stroke-width="1" opacity=".35"/>' +
+      '</g>';
+
+    // Indicador inicial
+    svg += '<text id="s1hint" x="180" y="352" text-anchor="middle" font-size="11" letter-spacing="3" fill="' + C.uv + '" class="pulse-soft" pointer-events="none">ARRASTRÁ LA LUZ</text>';
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const $ = (id) => el.querySelector("#" + id);
+
+    // ---------- Luz UV ----------
+    let moved = false;
+    function moverLuz(cx, cy) {
+      ["s1clipc", "s1maskc", "s1ring", "s1ring2"].forEach((id) => { $(id).setAttribute("cx", cx); $(id).setAttribute("cy", cy); });
+    }
+    let arrastrando = false;
+    // Distancia recorrida por el dedo: si arrastró la luz, no cuenta como "toque" sobre un objeto
+    let recorrido = 0, ultimo = null;
+    el.addEventListener("pointerdown", (e) => {
+      recorrido = 0; ultimo = { x: e.clientX, y: e.clientY };
+      // Si se toca un objeto o el cajón, no mover la luz
+      if (e.target.closest(".tappable")) return;
+      arrastrando = true;
+      el.setPointerCapture(e.pointerId);
+      mover(e);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (ultimo) { recorrido += Math.abs(e.clientX - ultimo.x) + Math.abs(e.clientY - ultimo.y); ultimo = { x: e.clientX, y: e.clientY }; }
+      if (arrastrando) mover(e);
+    });
+    el.addEventListener("pointerup",    () => { arrastrando = false; });
+    el.addEventListener("pointercancel",() => { arrastrando = false; });
+    function mover(e) {
+      const p = svgPoint(el, e.clientX, e.clientY);
+      const dy = e.pointerType === "mouse" ? 0 : 52; // en dedo, la luz va arriba para no taparla
+      moverLuz(clamp(p.x, 10, 350), clamp(p.y - dy, 80, 690));
+      if (!moved) {
+        moved = true;
+        $("s1hint").style.display = "none";
+        Sonido.play("sube");
+      }
+    }
+    // También se puede mover tocando y arrastrando sobre objetos (la luz sigue al dedo)
+    el.addEventListener("pointermove", (e) => {
+      if (!arrastrando && e.buttons === 1) mover(e);
+    });
+
+    // ---------- Objetos examinables ----------
+    let cardAbierta = false;
+    async function examinar(titulo, html) {
+      if (cardAbierta) return;
+      cardAbierta = true;
+      await UI.card(titulo, html);
+      cardAbierta = false;
+    }
+    const onTap = (id, f) => { $(id).addEventListener("click", () => { if (recorrido < 14) f(); }); };
+
+    onTap("s1lamp",   () => examinar("La lámpara", "Una lámpara de escritorio. Su luz es cálida, casi de otra época. Alguien la dejó encendida a propósito."));
+    onTap("s1cup",    () => examinar("La taza", "Una taza con un resto de té todavía tibio. Quien la usó se fue hace poco."));
+    onTap("s1bag",    () => examinar("La bolsa", "Una bolsa de papel que todavía huele a lomito árabe. El cartero tenía buen gusto."));
+    onTap("s1cal",    () => examinar("El calendario", "Noviembre. El día 28 está marcado con un círculo, repasado tantas veces que la tinta se corrió."));
+    onTap("s1window", () => examinar("La ventana", "Llueve desde hace horas. La ciudad está quieta y las luces se ven a lo lejos."));
+    onTap("s1note",   () => examinar("Nota del cartero",
+      "«Lo que no pude entregar lo marqué con símbolos que solo se ven con luz especial.<br><br>" +
+      "Para abrir el cajón, respetá el <b>orden de entrega</b>: primero lo que alumbra, después lo que se bebe, al final lo que se come.»"));
+    onTap("s1parcel", () => {
+      const n = CONFIG.CODIGO.length;
+      let cajas = '<div class="cajas">';
+      for (let i = 0; i < n; i++) cajas += "<span>" + (State.digitoGanado(i) ? CONFIG.CODIGO[i] : "") + "</span>";
+      cajas += "</div>";
+      examinar("El paquete", "Un paquete sellado a nombre de " + CONFIG.NOMBRE + ". El sello se abre con una clave de " + n + " dígitos." + cajas);
+    });
+
+    // ---------- Cajón ----------
+    let secuencia = [], bloqueado = false;
+    const ok = new Promise((resolve) => {
+      el.querySelectorAll(".s1btn").forEach((g) => {
+        g.addEventListener("click", async () => {
+          if (bloqueado || recorrido >= 14) return;
+          const sym = g.dataset.sym;
+          if (g.classList.contains("sel")) return;
+          g.classList.add("sel");
+          g.querySelector(".s1btnbg").setAttribute("fill", C.pink);
+          g.querySelector(".s1btnsym").setAttribute("fill", C.night);
+          g.querySelector(".s1btnsym").setAttribute("stroke", C.night);
+          secuencia.push(sym);
+          Sonido.play("tap");
+          if (secuencia.length < Sala1.SOLUCION.length) return;
+          bloqueado = true;
+          await sleep(450);
+          const correcto = secuencia.every((s, i) => s === Sala1.SOLUCION[i]);
+          if (correcto) {
+            // Cámara al cajón, el frente se abre y sale un sobre
+            Sonido.play("candado");
+            $("s1dim").style.opacity = "0";
+            $("s1uv").style.display = "none"; $("s1lens").style.display = "none";
+            const ph = el.querySelector("#s1hint"); if (ph) ph.style.display = "none";
+            await sleep(500);
+            await UI.zoomA(180, 600, 2.1, 1600, 0.62);
+            const face = $("s1face");
+            Sonido.play("cajon");
+            await UI.mover(face, 14, 500);                       // primero cede un poco
+            await sleep(150);
+            await UI.mover(face, 96, 1700, 0);                   // y baja del todo
+            await UI.emerger(180, 596);
+            resolve();
+          } else {
+            Sonido.play("error");
+            UI.shake(el.querySelector("#s1face"));
+            UI.say("El cajón no cede. El orden no es ese.", 3200);
+            await sleep(500);
+            await UI.penalizar();
+            secuencia = [];
+            el.querySelectorAll(".s1btn").forEach((b) => {
+              b.classList.remove("sel");
+              b.querySelector(".s1btnbg").setAttribute("fill", C.night3);
+              b.querySelector(".s1btnsym").setAttribute("fill", C.cream);
+              b.querySelector(".s1btnsym").setAttribute("stroke", C.cream);
+            });
+            bloqueado = false;
+          }
+        });
+      });
+    });
+
+    return {
+      el: wrap,
+      resuelto: ok,
+      alEntrar() { UI.say("Una luz UV. El cartero la usaba para marcar lo importante.", 5200); },
+      destruir() {}
+    };
+  }
+};
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ ///////////////  SALA 2 · LA SALA DE SELLOS (LÓGICA)  //////////////
+ ////////////////////////////////////////////////////////////////////
+ Mecánica: cuatro sellos de colores y un registro con cuatro espacios.
+ Tres reglas permiten deducir un único orden.
+ Reglas:  1) El ámbar abre el registro (primero).
+          2) El rosa va justo después del azul.
+          3) El crema no cierra el registro (no va último).
+ Solución: ámbar → crema → azul → rosa
+*/
+
+const Sala2 = {
+  id: 1,
+  kicker: "Sala 2",
+  titulo: "La sala de sellos",
+  pistas: [
+    "Leé las tres reglas del registro. Una de ellas te dice exactamente cuál sello va primero.",
+    "El ámbar va primero. El rosa tiene que ir justo después del azul, y el crema no puede quedar último.",
+    "El orden es: ámbar, crema, azul, rosa."
+  ],
+  SOLUCION: ["amber", "cream", "blue", "pink"],
+
+  construir() {
+    const COLOR = { amber: C.amber, cream: C.cream, blue: C.blue, pink: C.pink };
+    const NOMBRE = { amber: "ámbar", cream: "crema", blue: "azul", pink: "rosa" };
+    const RACK_ORDEN = ["blue", "amber", "pink", "cream"];
+    const SLOT_X = [34, 110, 186, 262];   // esquina izquierda de cada espacio
+    const SLOT_Y = 396, SLOT_W = 64, SLOT_H = 60;
+    const RACK_CX = [66, 142, 218, 294];
+
+    // Icono grabado en cada sello (centrado en cx, cy)
+    function icono(id, cx, cy, k) {
+      k = k || 1;
+      const t = 'transform="translate(' + cx + " " + cy + ") scale(" + k + ')"';
+      if (id === "amber") {
+        let rayos = "";
+        for (let a = 0; a < 8; a++) rayos += '<rect x="-1.4" y="-14" width="2.8" height="6" transform="rotate(' + a * 45 + ')"/>';
+        return '<g ' + t + ' fill="' + C.night + '"><circle r="6"/>' + rayos + "</g>";
+      }
+      if (id === "cream") return '<g ' + t + ' fill="' + C.night + '"><polygon points="0,-12 9,0 0,12 -9,0"/><polygon points="0,-5 4,0 0,5 -4,0" fill="' + C.cream + '"/></g>';
+      if (id === "blue")  return '<g ' + t + ' fill="none" stroke="' + C.night + '" stroke-width="2.6" stroke-linecap="round"><path d="M-12 -5 q3 -5 6 0 t6 0 t6 0 t6 0"/><path d="M-12 4 q3 -5 6 0 t6 0 t6 0 t6 0"/></g>';
+      return '<g ' + t + '><text y="5" text-anchor="middle" font-size="13" font-weight="bold" fill="' + C.night + '">' + CONFIG.FECHA_NOVIOS + "</text></g>";
+    }
+
+    let svg = "";
+
+    // Pared y casilleros
+    svg += '<g filter="url(#mano)"><rect x="-80" y="-20" width="520" height="780" fill="' + C.night2 + '"/>' +
+      mancha(300, 40, 30, C.night3, 0.35, 21) + mancha(30, 262, 24, C.night3, 0.3, 22) + vetas(-40, 10, 440, 50, 3, C.night3, 0.5, 23) + "</g>";
+    svg += '<g id="s2wall" class="tappable" filter="url(#mano)">';
+    svg += '<rect x="18" y="78" width="324" height="180" rx="3" fill="' + C.wood + '"/>';
+    const sobres = { "0,1": C.cream, "0,3": C.pink, "1,0": C.pinkPl, "1,2": C.cream, "1,4": C.blue, "2,1": C.pink, "2,3": C.cream };
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 5; c++) {
+        const x = 24 + c * 64, y = 84 + r * 58;
+        svg += '<rect x="' + x + '" y="' + y + '" width="56" height="52" fill="' + C.deep + '"/>';
+        svg += '<rect x="' + x + '" y="' + y + '" width="56" height="5" fill="#0a0e1c"/>';
+        const col = sobres[r + "," + c];
+        if (col) {
+          svg += '<g transform="rotate(' + ((r + c) % 3 - 1) * 3 + " " + (x + 28) + " " + (y + 40) + ')">' +
+            '<rect x="' + (x + 8) + '" y="' + (y + 22) + '" width="40" height="30" fill="' + col + '"/>' +
+            '<polygon points="' + (x + 8) + "," + (y + 22) + " " + (x + 48) + "," + (y + 22) + " " + (x + 28) + "," + (y + 38) + '" fill="' + C.night + '" opacity=".18"/></g>';
+        }
+        svg += '<rect x="' + (x + 12) + '" y="' + (y + 43) + '" width="' + (26 + (r * 5 + c * 3) % 12) + '" height="8" fill="' + C.cream2 + '" opacity=".7"/>' +
+               garabato(x + 15, y + 48, 18 + (r + c) % 3 * 5, C.night, 0.6, r * 7 + c + 1);
+      }
+    }
+    svg += "</g>";
+
+    // Casillero especial: se enciende al resolver (columna 3, fila 1)
+    svg += '<g id="s2open" style="opacity:0" pointer-events="none"><rect x="152" y="84" width="56" height="52" fill="none" stroke="' + C.pink + '" stroke-width="2.4"/>' +
+           '<rect x="148" y="80" width="64" height="60" fill="' + C.pink + '" opacity=".12"/></g>';
+
+    // Mesa
+    svg += '<g filter="url(#mano)"><rect x="-80" y="266" width="520" height="500" fill="' + C.wood2 + '"/>' +
+           '<rect x="-80" y="266" width="520" height="5" fill="' + C.wood3 + '"/>' +
+           vetas(-60, 276, 500, 260, 14, "#2a2030", 0.38, 31) + vetas(-60, 540, 500, 140, 6, "#2a2030", 0.38, 32) + "</g>";
+
+    // Registro (libro)
+    svg += '<g id="s2ledger" filter="url(#mano)">' +
+      '<rect x="22" y="284" width="316" height="238" rx="3" fill="' + C.cream2 + '"/>' +
+      '<rect x="18" y="280" width="316" height="238" rx="3" fill="' + C.cream + '"/>' +
+      '<rect x="18" y="280" width="9" height="238" fill="' + C.pinkDk + '"/>' +
+      '<rect x="296" y="518" width="14" height="30" fill="' + C.pink + '"/>' +
+      '<path d="M178 282 V516" stroke="' + C.night + '" stroke-width="1" opacity=".1"/>' +
+      anillo(304, 302, 16, 5, C.kraftDk, 0.5) + mancha(52, 500, 14, C.kraftDk, 0.18, 41) +
+      '<text x="176" y="310" text-anchor="middle" font-size="12" letter-spacing="3.4" font-weight="bold" fill="' + C.night + '">REGISTRO DE ENTREGA</text>' +
+      '<rect x="46" y="318" width="260" height="1.5" fill="' + C.night + '" opacity=".35"/>' +
+      '<g font-size="11.4" fill="' + C.night + '">' +
+        '<text x="40" y="338">1. El ámbar abre el registro.</text>' +
+        '<text x="40" y="356">2. El rosa va justo después del azul.</text>' +
+        '<text x="40" y="374">3. El crema no cierra el registro.</text>' +
+      '</g>' +
+      '<rect x="46" y="384" width="260" height="1.5" fill="' + C.night + '" opacity=".35"/>';
+    // Espacios del registro
+    for (let i = 0; i < 4; i++) {
+      svg += '<g class="tappable s2slot" data-i="' + i + '">' +
+        '<rect class="s2slotbg" x="' + SLOT_X[i] + '" y="' + SLOT_Y + '" width="' + SLOT_W + '" height="' + SLOT_H + '" rx="3" fill="' + C.cream2 + '" fill-opacity=".45" stroke="' + C.night + '" stroke-width="1.4" stroke-dasharray="4 3"/>' +
+        '<text x="' + (SLOT_X[i] + 32) + '" y="' + (SLOT_Y + 74) + '" text-anchor="middle" font-size="11" fill="' + C.night + '" opacity=".6">' + (i + 1) + "</text>";
+      Object.keys(COLOR).forEach((id) => {
+        svg += '<g class="imp" data-slot="' + i + '" data-id="' + id + '" style="display:none" pointer-events="none">' +
+          '<rect x="' + (SLOT_X[i] + 6) + '" y="' + (SLOT_Y + 5) + '" width="52" height="50" rx="3" fill="' + COLOR[id] + '" stroke="' + C.night + '" stroke-width="1.6"/>' +
+          icono(id, SLOT_X[i] + 32, SLOT_Y + 30, 1) + "</g>";
+      });
+      svg += "</g>";
+    }
+    // Botón de sellar
+    svg += '<g id="s2seal" class="tappable">' +
+      '<rect x="102" y="486" width="156" height="26" rx="2" fill="' + C.night + '"/>' +
+      '<text x="180" y="503" text-anchor="middle" font-size="12" letter-spacing="4" fill="' + C.pinkPl + '">SELLAR</text>' +
+      '</g>';
+    // Sello de “ENTREGADO” (aparece al resolver)
+    svg += '<g id="s2done" style="opacity:0;transition:opacity .25s, transform .35s cubic-bezier(.2,1.6,.4,1);transform-origin:178px 440px;transform:scale(2.2) rotate(-12deg)" pointer-events="none">' +
+      '<rect x="62" y="408" width="232" height="64" rx="4" fill="none" stroke="' + C.pinkDk + '" stroke-width="4"/>' +
+      '<text x="178" y="450" text-anchor="middle" font-size="30" font-weight="bold" letter-spacing="5" fill="' + C.pinkDk + '">ENTREGADO</text></g>';
+    svg += "</g>";
+
+    // Soporte de sellos
+    svg += '<rect filter="url(#mano)" x="18" y="550" width="324" height="90" rx="4" fill="' + C.wood + '"/>' +
+           '<rect x="18" y="550" width="324" height="5" fill="#2a2030"/>';
+    RACK_ORDEN.forEach((id, k) => {
+      const cx = RACK_CX[k];
+      svg += '<g class="tappable s2stamp" filter="url(#mano)" data-id="' + id + '" style="transition:transform .25s">' +
+        '<rect x="' + (cx - 13) + '" y="558" width="26" height="30" rx="9" fill="' + C.wood3 + '"/>' +
+        '<rect x="' + (cx - 19) + '" y="586" width="38" height="6" rx="2" fill="#8d7a96"/>' +
+        '<rect x="' + (cx - 27) + '" y="592" width="54" height="30" rx="3" fill="' + COLOR[id] + '"/>' +
+        '<rect x="' + (cx - 27) + '" y="620" width="54" height="4" rx="1" fill="' + C.night + '" opacity=".35"/>' +
+        icono(id, cx, 607, 0.85) +
+        "</g>";
+    });
+    svg += '<text x="180" y="662" text-anchor="middle" font-size="9.5" letter-spacing="2.4" fill="' + C.cream2 + '" opacity=".6">TOCÁ UN SELLO Y LUEGO UN ESPACIO</text>';
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+
+    // ---------- Estado de los espacios ----------
+    const slots = [null, null, null, null];
+    let sel = null, bloqueado = false;
+
+    function pintar() {
+      el.querySelectorAll(".imp").forEach((g) => {
+        const i = +g.dataset.slot;
+        g.style.display = slots[i] === g.dataset.id ? "" : "none";
+      });
+      el.querySelectorAll(".s2stamp").forEach((g) => {
+        const id = g.dataset.id;
+        const colocado = slots.indexOf(id) !== -1;
+        g.style.opacity = colocado ? "0.14" : "1";
+        g.style.transform = sel === id ? "translateY(-12px)" : "none";
+      });
+      el.querySelectorAll(".s2slotbg").forEach((r, i) => {
+        r.setAttribute("stroke", sel && !slots[i] ? C.pinkDk : C.night);
+        r.setAttribute("stroke-width", sel && !slots[i] ? 2.2 : 1.4);
+      });
+    }
+
+    el.querySelectorAll(".s2stamp").forEach((g) => {
+      g.addEventListener("click", () => {
+        if (bloqueado) return;
+        const id = g.dataset.id;
+        if (slots.indexOf(id) !== -1) return;
+        sel = sel === id ? null : id;
+        Sonido.play("tap");
+        pintar();
+      });
+    });
+    el.querySelectorAll(".s2slot").forEach((g) => {
+      g.addEventListener("click", () => {
+        if (bloqueado) return;
+        const i = +g.dataset.i;
+        if (sel) {
+          slots[i] = sel; sel = null;      // si había uno, vuelve solo al soporte
+          Sonido.play("sello");
+        } else if (slots[i]) {
+          slots[i] = null; Sonido.play("papel");
+        }
+        pintar();
+      });
+    });
+
+    // ---------- Pared de casilleros ----------
+    el.querySelector("#s2wall").addEventListener("click", () =>
+      UI.card("Los casilleros", "Cada casillero guarda cartas que nunca llegaron. Casi todas esperan un sello. El cartero las ordenaba siguiendo el registro."));
+
+    // ---------- Sellar ----------
+    const ok = new Promise((resolve) => {
+      el.querySelector("#s2seal").addEventListener("click", async () => {
+        if (bloqueado) return;
+        if (slots.some((s) => !s)) {
+          Sonido.play("error");
+          return UI.say("Faltan sellos en el registro.", 2800);
+        }
+        bloqueado = true;
+        Sonido.play("sello");
+        await sleep(350);
+        const correcto = slots.every((s, i) => s === Sala2.SOLUCION[i]);
+        if (correcto) {
+          // Cámara al registro: el sello cae con peso
+          await UI.zoomA(178, 430, 1.3, 1400, 0.5);
+          const d = el.querySelector("#s2done");
+          d.style.transition = "opacity .2s, transform .28s cubic-bezier(.5,0,.9,.6)";
+          d.style.opacity = "1"; d.style.transform = "scale(1) rotate(-12deg)";
+          await sleep(260);
+          Sonido.play("sello");
+          const led = el.querySelector("#s2ledger");
+          await UI.mover(led, 3, 90); await UI.mover(led, -1, 100); await UI.mover(led, 0, 120);
+          await sleep(1700);
+          // Se abre un casillero de la pared y sale un sobre
+          await UI.zoomFuera(1300);
+          await UI.zoomA(180, 112, 2.0, 1600, 0.58);
+          Sonido.play("cajon");
+          const hueco = el.querySelector("#s2open");
+          hueco.style.transition = "opacity 1.1s"; hueco.style.opacity = "1";
+          await sleep(1200);
+          await UI.emerger(180, 130);
+          resolve();
+        } else {
+          Sonido.play("error");
+          UI.shake(el.querySelector("#s2ledger"));
+          UI.say("Algo no encaja en el registro. Revisá las tres reglas.", 3600);
+          await sleep(500);
+          await UI.penalizar();
+          bloqueado = false;
+        }
+      });
+    });
+
+    pintar();
+    return {
+      el: wrap,
+      resuelto: ok,
+      alEntrar() { UI.say("Los sellos están desordenados. El registro dice cómo deben ir.", 5200); },
+      destruir() {}
+    };
+  }
+};
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ ////////////  SALA 3 · EL ARCHIVO (DISCO DE CIFRADO)  //////////////
+ ////////////////////////////////////////////////////////////////////
+ Mecánica: un papel con letras sin sentido y un disco de dos anillos.
+ La llave es la fecha de novios (CONFIG.FECHA_NOVIOS, ej. 14/12 → 1,4,1,2).
+ Cada letra de la frase se cifra con un número de la fecha, en orden, y la
+ fecha vuelve a empezar. Para cada letra hay que girar el disco hasta ese
+ número, traducir la letra y tocar FIJAR. Equivocarse traba el mecanismo.
+*/
+
+const Sala3 = {
+  id: 2,
+  kicker: "Sala 3",
+  titulo: "El archivo",
+  pistas: [
+    "El papel está escrito en clave. Cada letra del anillo interior corresponde a otra letra del anillo exterior.",
+    "Leé la nota del cartero: la llave es la fecha en que se hicieron novios, sin la barra. Cada número es una posición del disco.",
+    "Girá el anillo interior (o usá las flechas de los costados) hasta el primer número de la fecha (" + CONFIG.FECHA_NOVIOS.replace(/\D/g, "").split("").join(", ") + "), traducí la letra marcada en rosa y tocá FIJAR. Seguí con el siguiente número."
+  ],
+
+  construir() {
+    const CX = 180, CY = 510, RO = 106;
+    const PASO = 360 / 26;
+    const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    // Limpia la frase y calcula el texto cifrado
+    const frase = CONFIG.FRASE_SECRETA.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z ]/g, "");
+    const claves = CONFIG.FECHA_NOVIOS.replace(/\D/g, "").split("").map(Number);   // 14/12 → [1,4,1,2]
+    const rot = (ch, n) => { const i = ABC.indexOf(ch); return i === -1 ? ch : ABC[mod(i + n, 26)]; };
+    // Posiciones de las letras (sin contar espacios) y su número de llave
+    const letras = [];
+    frase.split("").forEach((ch, i) => { if (ch !== " ") letras.push({ pos: i, ch, k: claves[letras.length % claves.length] }); });
+    const cifrado = frase.split("").map((ch, i) => { const l = letras.find((x) => x.pos === i); return l ? rot(ch, l.k) : ch; }).join("");
+
+    let svg = "";
+
+    // Pared
+    svg += '<g filter="url(#mano)"><rect x="-80" y="-20" width="520" height="780" fill="' + C.night2 + '"/>';
+    for (let x = -60; x < 420; x += 30) svg += '<rect x="' + x + '" y="-20" width="2" height="780" fill="#283050"/>';
+    svg += mancha(40, 300, 26, C.night3, 0.3, 51) + mancha(320, 288, 20, C.night3, 0.3, 52) + vetas(-40, 20, 440, 50, 3, C.night3, 0.5, 53) + "</g>";
+
+    // Archivador
+    svg += '<rect filter="url(#mano)" x="20" y="82" width="320" height="200" rx="4" fill="' + C.wood + '" stroke="#2a2030" stroke-width="2"/>';
+    const flavor = [
+      "Cartas dirigidas a gente que se mudó. Ninguna lleva tu nombre.",
+      "Vacío. Alguien se llevó lo que había.",
+      "Sellos viejos de países que ya no existen.",
+      "Un rollo de hilo, una cinta y una estampilla suelta.",
+      "Papeles sueltos con direcciones tachadas.",
+      "Una libreta con las páginas arrancadas."
+    ];
+    const OBJ_R = 1, OBJ_C = 2; // cajón que se abre al resolver
+    let n = 0;
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 4; c++) {
+        const x = 27 + c * 78, y = 90 + r * 62;
+        const objetivo = (r === OBJ_R && c === OBJ_C);
+        svg += '<g class="tappable s3dr" filter="url(#mano)" data-obj="' + (objetivo ? 1 : 0) + '" data-f="' + (n % flavor.length) + '"' + (objetivo ? ' id="s3target"' : "") + ">" +
+          '<rect x="' + x + '" y="' + y + '" width="72" height="56" rx="2" fill="#241a28"/>' +
+          '<g class="face"' + (r === 2 && c === 0 ? ' transform="translate(0 6)"' : "") + ">" +
+            '<rect x="' + x + '" y="' + y + '" width="72" height="54" rx="2" fill="' + C.wood2 + '" stroke="#2e2230" stroke-width="1.5"/>' +
+            '<rect x="' + (x + 20) + '" y="' + (y + 12) + '" width="32" height="13" fill="' + C.cream2 + '"/>' +
+            '<text x="' + (x + 36) + '" y="' + (y + 22) + '" text-anchor="middle" font-size="9" fill="' + C.night + '">' + ABC[n] + "</text>" +
+            '<rect x="' + (x + 28) + '" y="' + (y + 36) + '" width="16" height="5" rx="2.5" fill="' + C.cream2 + '"/>' +
+          "</g></g>";
+        n++;
+      }
+    }
+
+    // Nota pegada
+    svg += '<g id="s3note" class="tappable" filter="url(#mano)"><g transform="translate(0 22) rotate(5 310 112)">' +
+      '<rect x="284" y="70" width="52" height="64" fill="' + C.cream + '"/>' +
+      '<rect x="297" y="63" width="26" height="12" fill="' + C.pinkPl + '" opacity=".9"/>' +
+      '<g fill="' + C.night3 + '"><rect x="292" y="88" width="36" height="2"/><rect x="292" y="98" width="30" height="2"/><rect x="292" y="108" width="36" height="2"/><rect x="292" y="118" width="22" height="2"/></g>' +
+      "</g></g>";
+
+    // Mesa
+    svg += '<g filter="url(#mano)"><rect x="-80" y="292" width="520" height="500" fill="' + C.wood2 + '"/><rect x="-80" y="292" width="520" height="5" fill="' + C.wood3 + '"/>' +
+           vetas(-60, 300, 500, 330, 16, "#2a2030", 0.38, 61) + "</g>";
+
+    // Papel con el mensaje
+    const tam = cifrado.length <= 8 ? 28 : cifrado.length <= 12 ? 21 : 15;
+    svg += '<g filter="url(#mano)" transform="rotate(-1.2 180 340)">' +
+      '<rect x="34" y="304" width="292" height="84" fill="' + C.cream + '"/>' +
+      '<text x="180" y="322" text-anchor="middle" font-size="9" letter-spacing="3" fill="' + C.night3 + '">MENSAJE INTERCEPTADO</text>' +
+      '<text id="s3cipher" x="180" y="354" text-anchor="middle" font-size="' + tam + '" letter-spacing="5" font-weight="bold" fill="' + C.night + '">' +
+        cifrado.split("").map((ch, i) => '<tspan data-p="' + i + '">' + (ch === " " ? "\u00a0" : ch) + "</tspan>").join("") + "</text>" +
+      '<text id="s3plain" x="180" y="379" text-anchor="middle" font-size="14" letter-spacing="4" fill="' + C.pinkDk + '"></text>' +
+      '<path d="M34 346 H326" stroke="' + C.night + '" stroke-width="1" opacity=".07"/>' +
+      anillo(296, 330, 15, 5, C.kraftDk, 0.5) +
+      '<rect x="26" y="298" width="24" height="10" fill="' + C.pinkPl + '" opacity=".75" transform="rotate(-35 38 303)"/>' +
+      '<rect x="310" y="382" width="24" height="10" fill="' + C.pinkPl + '" opacity=".75" transform="rotate(-35 322 387)"/>' +
+      "</g>";
+
+    // Disco de cifrado: anillo exterior fijo
+    svg += '<g id="s3disc">' +
+      '<circle cx="' + CX + '" cy="' + CY + '" r="' + (RO + 3) + '" fill="' + C.night + '"/>' +
+      '<circle cx="' + CX + '" cy="' + CY + '" r="' + RO + '" fill="' + C.night3 + '" stroke="' + C.cream2 + '" stroke-width="1.5"/>';
+    for (let j = 0; j < 26; j++) {
+      const a = j * PASO;
+      svg += '<text x="' + CX + '" y="' + (CY - 92) + '" text-anchor="middle" font-size="11.5" font-weight="bold" fill="' + C.cream + '" transform="rotate(' + a.toFixed(2) + " " + CX + " " + CY + ')">' + ABC[j] + "</text>";
+      svg += '<rect x="' + (CX - 0.7) + '" y="' + (CY - RO) + '" width="1.4" height="7" fill="' + C.cream2 + '" opacity=".5" transform="rotate(' + (a + PASO / 2).toFixed(2) + " " + CX + " " + CY + ')"/>';
+    }
+    // Anillo interior giratorio
+    svg += '<g id="s3inner" style="transition:transform .16s ease-out;transform-origin:' + CX + "px " + CY + 'px">' +
+      '<circle cx="' + CX + '" cy="' + CY + '" r="78" fill="' + C.cream2 + '"/>' +
+      '<circle cx="' + CX + '" cy="' + CY + '" r="52" fill="none" stroke="' + C.night + '" stroke-width="1" opacity=".5"/>';
+    for (let k = 0; k < 26; k++) {
+      const a = k * PASO;
+      svg += '<text x="' + CX + '" y="' + (CY - 62) + '" text-anchor="middle" font-size="11" font-weight="bold" fill="' + (k === 0 ? C.pinkDk : C.night) + '" transform="rotate(' + a.toFixed(2) + " " + CX + " " + CY + ')">' + ABC[k] + "</text>";
+    }
+    svg += "</g>" +
+      '<circle cx="' + CX + '" cy="' + CY + '" r="41" fill="' + C.night + '" stroke="' + C.pink + '" stroke-width="1.5"/>' +
+      '<text x="' + CX + '" y="' + (CY - 12) + '" text-anchor="middle" font-size="7.5" letter-spacing="2.4" fill="' + C.cream2 + '">POSICIÓN</text>' +
+      '<text id="s3pos" x="' + CX + '" y="' + (CY + 16) + '" text-anchor="middle" font-size="30" font-weight="bold" fill="' + C.pink + '">0</text>' +
+      '<polygon points="' + (CX - 7) + "," + (CY - RO - 9) + " " + (CX + 7) + "," + (CY - RO - 9) + " " + CX + "," + (CY - RO + 3) + '" fill="' + C.pink + '"/>' +
+      "</g>";
+
+    // Botón para fijar la posición del disco
+    svg += '<g id="s3fix" class="tappable"><rect x="118" y="632" width="124" height="30" rx="3" fill="' + C.night + '" stroke="' + C.pink + '" stroke-width="1.5"/>' +
+      '<text x="180" y="652" text-anchor="middle" font-size="12" letter-spacing="4" fill="' + C.pinkPl + '">FIJAR</text></g>';
+
+    // Flechas laterales
+    [["s3prev", 44, "M4 -9 L-5 0 L4 9"], ["s3next", 316, "M-4 -9 L5 0 L-4 9"]].forEach((b) => {
+      svg += '<g id="' + b[0] + '" class="tappable"><circle cx="' + b[1] + '" cy="' + CY + '" r="20" fill="' + C.night3 + '" stroke="' + C.cream2 + '" stroke-width="1.5"/>' +
+        '<path transform="translate(' + b[1] + " " + CY + ')" d="' + b[2] + '" fill="none" stroke="' + C.cream + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>';
+    });
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const $ = (id) => el.querySelector("#" + id);
+
+    // ---------- Giro del disco ----------
+    let s = 0, resuelto = false, esperando = null;
+
+    function actualizar() {
+      $("s3inner").style.transform = "rotate(" + (s * PASO) + "deg)";
+      $("s3pos").textContent = s;
+      pinta();
+    }
+    // Línea de progreso: letras ya traducidas y puntos por las que faltan
+    let hechas = 0;
+    function pinta() {
+      $("s3plain").textContent = frase.split("").map((ch, i) => {
+        if (ch === " ") return "\u00a0\u00a0";
+        const n = letras.findIndex((x) => x.pos === i);
+        return n < hechas ? ch : "·";
+      }).join(" ");
+      el.querySelectorAll("#s3cipher tspan").forEach((t) => {
+        const n = letras.findIndex((x) => x.pos === +t.dataset.p);
+        t.setAttribute("fill", n === hechas ? C.pinkDk : n >= 0 && n < hechas ? C.night3 : C.night);
+        t.setAttribute("opacity", n >= 0 && n < hechas ? 0.45 : 1);
+      });
+    }
+    // Fijar el disco en la posición actual (si es la incorrecta, se traba)
+    let fijando = false;
+    async function fijar() {
+      if (resuelto || fijando) return;
+      fijando = true;
+      Sonido.play("tap");
+      await sleep(350);
+      const actual = letras[hechas];
+      if (s === actual.k) {
+        hechas++; Sonido.play("par"); pinta();
+        if (hechas === letras.length) { terminar(); return; }
+        UI.say("Una letra menos. Ahora, la siguiente.", 2600);
+        fijando = false; return;
+      }
+      Sonido.play("error");
+      UI.shake($("s3inner"));
+      UI.say("Con ese número la letra no cobra sentido. Esa no es la posición.", 3600);
+      await sleep(500);
+      await UI.penalizar();
+      fijando = false;
+    }
+
+    function paso(d) {
+      if (resuelto) return;
+      s = mod(s + d, 26);
+      Sonido.play("tick");
+      actualizar();
+    }
+
+    let giro = null;
+    el.addEventListener("pointerdown", (e) => {
+      if (resuelto) return;
+      const p = svgPoint(el, e.clientX, e.clientY);
+      const dx = p.x - CX, dy = p.y - CY, dist = Math.hypot(dx, dy);
+      if (dist < 42 || dist > RO + 14) return;
+      giro = { a0: Math.atan2(dx, -dy) * 180 / Math.PI, s0: s };
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!giro || resuelto) return;
+      const p = svgPoint(el, e.clientX, e.clientY);
+      const a = Math.atan2(p.x - CX, -(p.y - CY)) * 180 / Math.PI;
+      let d = a - giro.a0;
+      if (d > 180) d -= 360; if (d < -180) d += 360;
+      const ns = mod(giro.s0 + Math.round(d / PASO), 26);
+      if (ns !== s) { s = ns; Sonido.play("tick"); actualizar(); }
+    });
+    const finGiro = () => { giro = null; };
+    el.addEventListener("pointerup", finGiro);
+    el.addEventListener("pointercancel", finGiro);
+    $("s3prev").addEventListener("click", () => paso(-1));
+    $("s3next").addEventListener("click", () => paso(1));
+    $("s3fix").addEventListener("click", fijar);
+
+    // ---------- Objetos ----------
+    $("s3note").addEventListener("click", () =>
+      UI.card("Nota del cartero",
+        "«Mi llave es una fecha: el día en que nos hicimos novios, sin la barra. " +
+        "Cada letra usa un número de esa fecha, en orden. Cuando se acaba la fecha, vuelve a empezar. " +
+        "Poné el disco en ese número, traducí la letra con los dos anillos y fijala.»"));
+    el.querySelectorAll(".s3dr").forEach((g) => {
+      g.addEventListener("click", () => {
+        if (resuelto) return;
+        if (g.dataset.obj === "1") UI.card("Un cajón cerrado", "Este cajón no tiene cerradura de llave. Se abre con una frase, y la frase está escrita en clave. La llave de la clave es una fecha.");
+        else UI.card("Cajón", flavor[+g.dataset.f]);
+      });
+    });
+
+    // ---------- Resolución ----------
+    let terminarFn;
+    const ok = new Promise((r) => { terminarFn = r; });
+    async function terminar() {
+      resuelto = true;
+      Sonido.play("chime");
+      $("s3plain").textContent = frase;
+      $("s3plain").setAttribute("fill", C.pink);
+      $("s3plain").setAttribute("font-weight", "bold");
+      UI.say("Esa frase te suena.", 3600);
+      await sleep(2200);
+      await UI.zoomA(219, 179, 2.6, 1800, 0.5);
+      Sonido.play("candado");
+      await sleep(700);
+      const t = $("s3target").querySelector(".face");
+      Sonido.play("cajon");
+      await UI.mover(t, 5, 500);
+      await sleep(150);
+      await UI.mover(t, 46, 1700, 0);
+      await UI.emerger(219, 176);
+      terminarFn();
+    }
+
+    actualizar();
+    return {
+      el: wrap,
+      resuelto: ok,
+      alEntrar() { UI.say("Un mensaje sin sentido y un disco de cifrado. La llave tiene que ser una fecha.", 5600); },
+      destruir() { clearTimeout(esperando); }
+    };
+  }
+};
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ /////////////  SALA 4 · LA TORRE DE RADIO (SEÑAL)  /////////////////
+ ////////////////////////////////////////////////////////////////////
+ Mecánica: una radio con un osciloscopio. La onda rosa es la señal objetivo.
+ Con dos controles (frecuencia y fase) hay que superponer la onda crema.
+ A medida que se acerca, la estática baja y aparece una melodía.
+*/
+
+const Sala4 = {
+  id: 3,
+  kicker: "Sala 4",
+  titulo: "La torre de radio",
+  pistas: [
+    "La señal llega mezclada con estática. Tenés dos controles para sintonizarla.",
+    "La línea rosa es la señal que hay que alcanzar. Movés los controles hasta que la línea crema se superponga.",
+    "Primero ajustá la frecuencia hasta que ambas ondas tengan la misma cantidad de picos. Después ajustá la fase hasta que coincidan exactamente."
+  ],
+
+  construir() {
+    // Parámetros de la señal objetivo
+    const F0 = 3.4, P0 = 2.1;
+    const F_MIN = 1.0, F_MAX = 6.0;
+    const SX = 60, SW = 240, SY = 224, AMP = 56, N = 90;     // pantalla
+    const TX0 = 66, TX1 = 294;                                 // rieles de los controles
+
+    let svg = "";
+    svg += '<rect x="-80" y="-20" width="520" height="780" fill="' + C.night + '"/>';
+
+    // Antenas
+    svg += '<g stroke="' + C.cream2 + '" stroke-width="2.4" stroke-linecap="round"><line x1="96" y1="86" x2="70" y2="62"/><line x1="264" y1="86" x2="290" y2="62"/></g>' +
+           '<circle cx="70" cy="62" r="4" fill="' + C.pink + '"/><circle cx="290" cy="62" r="4" fill="' + C.pink + '"/>';
+
+    // Carcasa de la radio
+    svg += '<g filter="url(#mano)"><rect x="22" y="86" width="316" height="566" rx="22" fill="' + C.wood + '" stroke="#2a2030" stroke-width="2"/>' +
+           vetas(24, 90, 312, 60, 4, "#2a2030", 0.5, 71) + vetas(24, 600, 312, 48, 4, "#2a2030", 0.5, 72) +
+           '<rect x="36" y="100" width="288" height="538" rx="14" fill="' + C.night2 + '"/>' +
+           '<circle cx="46" cy="110" r="3" fill="' + C.cream2 + '" opacity=".6"/><circle cx="314" cy="110" r="3" fill="' + C.cream2 + '" opacity=".6"/>' +
+           '<circle cx="46" cy="628" r="3" fill="' + C.cream2 + '" opacity=".6"/><circle cx="314" cy="628" r="3" fill="' + C.cream2 + '" opacity=".6"/>' +
+           '<rect x="120" y="446" width="120" height="15" fill="' + C.cream + '" opacity=".9" transform="rotate(-1 180 453)"/>' +
+           garabato(126, 456, 106, C.night, 0.7, 73) +
+           '<rect x="276" y="142" width="22" height="14" fill="' + C.pinkDk + '" opacity=".0"/>' +
+           mancha(300, 600, 22, C.night3, 0.5, 74) + "</g>" +
+           '<text x="180" y="124" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">RADIO · TORRE NORTE</text>';
+
+    // Pantalla
+    svg += '<rect x="52" y="140" width="256" height="168" rx="8" fill="' + C.deep + '" stroke="' + C.cream2 + '" stroke-width="1.5"/>';
+    for (let i = 1; i < 8; i++) svg += '<rect x="' + (52 + i * 32) + '" y="142" width="1" height="164" fill="#1d2744"/>';
+    for (let j = 1; j < 6; j++) svg += '<rect x="54" y="' + (140 + j * 28) + '" width="252" height="1" fill="' + (j === 3 ? "#2a3560" : "#1d2744") + '"/>';
+    svg += '<path id="s4target" fill="none" stroke="' + C.pink + '" stroke-width="2" stroke-dasharray="5 4" opacity=".9"/>' +
+           '<path id="s4user" fill="none" stroke="' + C.cream + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' +
+           '<g id="s4ok" style="opacity:0;transition:opacity .5s" pointer-events="none">' +
+             '<rect x="52" y="140" width="256" height="168" rx="8" fill="' + C.deep + '" opacity=".78"/>' +
+             '<text x="180" y="230" text-anchor="middle" font-size="15" letter-spacing="5" fill="' + C.pink + '">SEÑAL FIJADA</text></g>';
+
+    // Medidor de señal
+    svg += '<text x="52" y="337" font-size="9" letter-spacing="3" fill="' + C.cream2 + '">SEÑAL</text>';
+    for (let i = 0; i < 8; i++) svg += '<rect class="s4bar" x="' + (104 + i * 24) + '" y="327" width="18" height="12" rx="2" fill="' + C.night3 + '"/>';
+
+    // Altavoz
+    svg += '<rect x="52" y="362" width="256" height="78" rx="6" fill="#151a2c"/>';
+    for (let i = 0; i < 8; i++) svg += '<rect x="62" y="' + (372 + i * 8.2) + '" width="236" height="3.4" rx="1.7" fill="' + C.night3 + '"/>';
+
+    // Controles
+    function control(id, etiqueta, y) {
+      let s = '<text x="52" y="' + (y - 28) + '" font-size="10" letter-spacing="4" fill="' + C.cream2 + '">' + etiqueta + "</text>" +
+        '<rect x="' + TX0 + '" y="' + (y - 3) + '" width="' + (TX1 - TX0) + '" height="6" rx="3" fill="' + C.night3 + '"/>';
+      for (let i = 0; i <= 10; i++) s += '<rect x="' + (TX0 + i * (TX1 - TX0) / 10 - 0.7) + '" y="' + (y + 12) + '" width="1.4" height="' + (i % 5 === 0 ? 9 : 5) + '" fill="' + C.cream2 + '" opacity=".5"/>';
+      s += '<g id="' + id + 'h"><circle r="17" fill="' + C.cream + '" stroke="' + C.pinkDk + '" stroke-width="2.5"/><circle r="5" fill="' + C.pinkDk + '"/></g>' +
+           '<rect class="s4track" data-k="' + id + '" x="46" y="' + (y - 24) + '" width="268" height="48" fill="transparent"/>';
+      return s;
+    }
+    svg += control("s4f", "FRECUENCIA", 504) + control("s4p", "FASE", 580);
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const $ = (id) => el.querySelector("#" + id);
+
+    // ---------- Estado de los controles (0 a 1) ----------
+    const val = { s4f: 0.12, s4p: 0.7 };
+    const Y = { s4f: 504, s4p: 580 };
+    let activo = null, fijado = false, resuelto = false;
+
+    const freq  = () => F_MIN + val.s4f * (F_MAX - F_MIN);
+    const fase  = () => val.s4p * Math.PI * 2;
+
+    function ruta(f, p, jitter) {
+      let d = "";
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        let y = SY - AMP * Math.sin(2 * Math.PI * f * t + p);
+        if (jitter) y += (Math.random() * 2 - 1) * jitter;
+        d += (i ? "L" : "M") + (SX + t * SW).toFixed(1) + " " + y.toFixed(1);
+      }
+      return d;
+    }
+    $("s4target").setAttribute("d", ruta(F0, P0, 0));
+
+    function cercania() {
+      const df = Math.abs(freq() - F0);
+      const dp = Math.abs(mod(fase() - P0 + Math.PI, Math.PI * 2) - Math.PI);
+      const c = Math.max(0, 1 - df / 1.5) * Math.max(0, 1 - dp / 1.9);
+      return { c, ok: df <= 0.15 && dp <= 0.22 };
+    }
+
+    let radio = null, mantener = 0, ultimo = { c: 0, ok: false };
+
+    function dibujar() {
+      ["s4f", "s4p"].forEach((k) => {
+        $(k + "h").setAttribute("transform", "translate(" + (TX0 + val[k] * (TX1 - TX0)) + " " + Y[k] + ")");
+      });
+      ultimo = cercania();
+      const jit = fijado ? 0 : 9 * Math.pow(1 - ultimo.c, 1.6);
+      $("s4user").setAttribute("d", ruta(freq(), fase(), jit));
+      $("s4user").setAttribute("stroke", fijado ? C.pink : C.cream);
+      const encendidas = fijado ? 8 : Math.round(ultimo.c * 8 - 0.4);
+      el.querySelectorAll(".s4bar").forEach((b, i) => b.setAttribute("fill", i < encendidas ? C.pink : C.night3));
+      if (radio) radio.set(fijado ? 1 : ultimo.c);
+    }
+
+    // ---------- Arrastre de los controles ----------
+    function desde(e) {
+      const p = svgPoint(el, e.clientX, e.clientY);
+      val[activo] = clamp((p.x - TX0) / (TX1 - TX0), 0, 1);
+      dibujar();
+    }
+    el.addEventListener("pointerdown", (e) => {
+      const t = e.target.closest(".s4track");
+      if (!t || fijado) return;
+      activo = t.dataset.k;
+      el.setPointerCapture(e.pointerId);
+      desde(e);
+    });
+    el.addEventListener("pointermove", (e) => { if (activo && !fijado) desde(e); });
+    const suelta = () => { activo = null; };
+    el.addEventListener("pointerup", suelta);
+    el.addEventListener("pointercancel", suelta);
+
+    // ---------- Bucle: estática viva + detección de coincidencia ----------
+    let terminarFn;
+    const ok = new Promise((r) => { terminarFn = r; });
+    const timer = setInterval(() => {
+      if (fijado) return;
+      dibujar();   // refresca la estática
+      if (ultimo.ok) {
+        mantener += 70;
+        if (mantener >= 1800) fijar();
+      } else mantener = 0;
+    }, 70);
+
+    async function fijar() {
+      fijado = true;
+      dibujar();
+      Sonido.play("chime");
+      $("s4ok").style.opacity = "1";
+      UI.say("La estática se apaga. Ahora se escucha con claridad.", 4200);
+      await sleep(2800);
+      if (radio) radio.stop();
+      await UI.zoomA(180, 420, 1.7, 1600, 0.55);
+      Sonido.play("cajon");
+      await sleep(500);
+      await UI.emerger(180, 436);
+      terminarFn();
+    }
+
+    dibujar();
+    return {
+      el: wrap,
+      resuelto: ok,
+      alEntrar() {
+        radio = Sonido.radio();
+        dibujar();
+        UI.say("Una radio vieja. La señal llega, pero cortada.", 5200);
+      },
+      destruir() { clearInterval(timer); if (radio) radio.stop(); }
+    };
+  }
+};
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ ////////////  SEGUNDOS DESAFÍOS (UNO POR SALA, PASO 2)  ////////////
+ ////////////////////////////////////////////////////////////////////
+ Cada sala tiene un segundo desafío, distinto del primero:
+   Paso1 · Carta rota       (sala 1)  ordenar tiras de papel
+   Paso2 · Buzón de sobres  (sala 2)  puzzle deslizante 3x3
+   Paso3 · Memoria          (sala 3)  encontrar los pares
+   Paso4 · Secuencia radio  (sala 4)  repetir una melodía
+ Todos exponen { pistas[3], construir() → { el, resuelto, alEntrar, destruir } }
+*/
+
+// ===================================================================
+// FONDO COMÚN: primer plano de madera, para que se sienta "más cerca"
+// ===================================================================
+function fondoCierre(seed) {
+  return '<rect x="-80" y="-20" width="520" height="780" fill="' + C.wood + '"/>' +
+    '<g filter="url(#mano)">' + vetas(-40, 0, 440, 720, 26, "#2a2030", 0.45, seed) + "</g>" +
+    mancha(40, 640, 30, C.night3, 0.35, seed + 3) + anillo(312, 96, 22, 17, C.wood3, 0.5);
+}
+
+// Detecta el elemento tocado (con data-i) dentro de la escena
+function tocado(e) {
+  const t = e.target && e.target.closest ? e.target.closest("[data-i]") : null;
+  return t ? +t.getAttribute("data-i") : -1;
+}
+
+// ===================================================================
+// PASO 1 · CARTA ROTA (sala 1)
+// ===================================================================
+const Paso1 = {
+  pistas: [
+    "La carta se rompió en tiras y quedaron mezcladas. Tocá dos tiras para intercambiarlas.",
+    "Una carta empieza siempre por el nombre de quien la recibe, y termina con lo que no se pudo entregar.",
+    "Primero va tu nombre. Después las frases se encadenan: \"a la única oficina del mundo\" va antes de \"donde se guardan las cosas\"."
+  ],
+  construir() {
+    const LINEAS = [
+      CONFIG.NOMBRE + ":",
+      "si estás leyendo esto,",
+      "es porque lograste entrar",
+      "a la única oficina del mundo",
+      "donde se guardan las cosas",
+      "que no pude entregarte en persona."
+    ];
+    const X = 30, W = 300, H = 70, STEP = 82, Y0 = 128;
+    // Orden mezclado con a lo sumo un acierto de entrada
+    let orden;
+    do {
+      orden = LINEAS.map((_, i) => i).sort(() => Math.random() - 0.5);
+    } while (orden.filter((v, i) => v === i).length > 1);
+
+    let svg = fondoCierre(81);
+    svg += '<text x="180" y="96" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">CARTA ROTA</text>';
+    LINEAS.forEach((txt, id) => {
+      const R = rng(500 + id * 13);
+      let d = "M0 " + (R() * 4).toFixed(1);
+      for (let x = 12; x <= W; x += 12) d += " L" + x + " " + (R() * 5).toFixed(1);
+      d += " L" + W + " " + (H - R() * 4).toFixed(1);
+      for (let x = W - 12; x >= 0; x -= 12) d += " L" + x + " " + (H - R() * 5).toFixed(1);
+      d += " Z";
+      svg += '<g class="p1s" data-i="' + id + '" style="transform:translate(' + X + "px," + Y0 + 'px);transition:transform .45s ease">' +
+        '<g class="p1in" style="transform-box:fill-box;transform-origin:center;transition:transform .3s">' +
+        '<path d="' + d + '" fill="' + [C.cream, "#efe2d0", "#f0e6d6", "#ead9c2", C.cream, "#f1e4d3"][id] + '" stroke="' + C.cream2 + '" stroke-width="1.5" transform="translate(0 -1)"/>' +
+        (id % 2 ? mancha(40 + id * 37, 44, 9, C.kraftDk, 0.22, 60 + id) : anillo(250 - id * 9, 36, 15, 9, C.kraftDk, 0.35)) +
+        '<path d="M' + (8 + id * 6) + ' ' + (H - 9) + ' q' + (60 + id * 11) + ' ' + (id % 2 ? 3 : -3) + ' ' + (110 + id * 7) + ' 0" fill="none" stroke="' + C.night + '" stroke-width="1" opacity=".18"/>' +
+        '<path class="p1sel" d="' + d + '" fill="none" stroke="' + C.pinkDk + '" stroke-width="3" opacity="0"/>' +
+        '<text x="' + (W / 2) + '" y="' + (H / 2 + 5) + '" text-anchor="middle" transform="rotate(' + ((id % 3) - 1) * 0.9 + " " + (W / 2) + " " + (H / 2) + ')" font-size="' + (txt.length > 30 ? 13 : 16) + '" font-style="italic" fill="' + C.night + '" opacity=".92" style="filter:url(#tinta)">' + txt + "</text>" +
+        "</g></g>";
+    });
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const tiras = [...el.querySelectorAll(".p1s")];
+    let sel = -1, resolver, hecho = false;
+    const ok = new Promise((r) => (resolver = r));
+    const inclinacion = (id) => ((id * 37) % 7 - 3) * 0.7;
+
+    function pinta(alineado) {
+      orden.forEach((id, pos) => {
+        const t = tiras[id];
+        t.style.transform = "translate(" + (X + (alineado ? 0 : ((id * 5) % 9) - 4)) + "px," + (Y0 + pos * STEP) + "px)";
+        t.querySelector(".p1in").style.transform = "rotate(" + (alineado ? 0 : inclinacion(id)) + "deg)";
+        t.querySelector(".p1sel").setAttribute("opacity", id === sel ? 1 : 0);
+      });
+      wrap.dataset.orden = orden.join(",");
+    }
+    function revisa() {
+      if (orden.every((v, i) => v === i)) {
+        hecho = true; sel = -1; pinta(true);
+        Sonido.play("sello");
+        setTimeout(() => resolver(), 900);
+      }
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const id = tocado(e);
+      if (id < 0) return;
+      Sonido.play("papel");
+      if (sel < 0) { sel = id; pinta(false); return; }
+      if (sel === id) { sel = -1; pinta(false); return; }
+      const a = orden.indexOf(sel), b = orden.indexOf(id);
+      [orden[a], orden[b]] = [orden[b], orden[a]];
+      sel = -1; pinta(false); revisa();
+    });
+    pinta(false);
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Alguien rompió esta carta antes de enviarla.", 4200); }, destruir() {} };
+  }
+};
+
+// ===================================================================
+// PASO 2 · BUZÓN DE SOBRES (sala 2) · puzzle deslizante 3x3
+// ===================================================================
+const Paso2 = {
+  pistas: [
+    "Los sobres tienen que quedar numerados del 1 al 8. Tocá uno al lado del hueco para deslizarlo.",
+    "Armá primero la fila de arriba (1, 2, 3). Después la del medio. La última fila se resuelve sola.",
+    "Mirá el esquema pequeño de abajo: así debe quedar. Si te trabás, deshacé el último movimiento antes de seguir."
+  ],
+  construir() {
+    const T = 92, G = 8, BX = 34, BY = 150;
+    const META = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+    // Mezcla con movimientos válidos (siempre tiene solución)
+    let b = META.slice(), vacio = 8, previo = -1;
+    for (let k = 0; k < 40 || b.every((v, i) => v === META[i]); k++) {
+      const x = vacio % 3, y = (vacio / 3) | 0, vec = [];
+      if (x > 0) vec.push(vacio - 1);
+      if (x < 2) vec.push(vacio + 1);
+      if (y > 0) vec.push(vacio - 3);
+      if (y < 2) vec.push(vacio + 3);
+      const op = vec.filter((v) => v !== previo);
+      const n = op[(Math.random() * op.length) | 0];
+      b[vacio] = b[n]; b[n] = 0; previo = vacio; vacio = n;
+    }
+    const pos = (p) => ({ x: BX + (p % 3) * (T + G), y: BY + ((p / 3) | 0) * (T + G) });
+
+    let svg = fondoCierre(91);
+    svg += '<text x="180" y="108" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">BUZÓN · ORDENAR LOS SOBRES</text>';
+    svg += '<rect x="' + (BX - 8) + '" y="' + (BY - 8) + '" width="' + (3 * T + 2 * G + 16) + '" height="' + (3 * T + 2 * G + 16) + '" rx="6" fill="' + C.deep + '" opacity=".6"/>';
+    for (let n = 1; n <= 8; n++) {
+      const R = rng(700 + n * 31), col = ["#c9a77c", "#c4a176", "#cfae85", "#bf9d73", "#c9a77c", "#d2b48c", "#c2a078", "#cbab80"][n - 1];
+      const j = () => ((R() - 0.5) * 5).toFixed(1);
+      svg += '<g class="p2t" data-i="' + n + '" style="transition:transform .22s ease"><g filter="url(#mano)" transform="rotate(' + ((R() - 0.5) * 3.6).toFixed(1) + " " + T / 2 + " " + T / 2 + ')">' +
+        '<path d="M' + j() + " " + j() + " L" + (T + +j()) + " " + j() + " L" + (T + +j()) + " " + (T + +j()) + " L" + j() + " " + (T + +j()) + ' Z" fill="' + col + '" stroke="' + C.kraftDk + '" stroke-width="2"/>' +
+        '<path d="M2 3 L' + (T / 2 + +j()) + " " + (T * 0.5 + +j()) + " L" + (T - 2) + ' 3" fill="' + C.kraftDk + '" opacity=".5" stroke="' + C.kraftDk + '" stroke-width="1.5"/>' +
+        (n % 3 === 0 ? mancha(70, 74, 9, C.wood, 0.18, n) : n % 3 === 1 ? anillo(24, 70, 11, 7, C.wood, 0.28) : '<path d="M' + (T - 26) + ' ' + (T - 2) + " l22 -22 v22 Z" + '" fill="' + C.kraftDk + '" opacity=".45"/>') +
+        '<circle cx="' + (T / 2 + +j()) + '" cy="' + (T * 0.5 + 2) + '" r="' + (8 + R() * 3).toFixed(1) + '" fill="' + (n % 2 ? C.pinkDk : C.pink) + '"/>' +
+        '<text x="' + (T / 2 + (R() * 8 - 4)).toFixed(1) + '" y="' + (T - 14 + (R() * 4 - 2)).toFixed(1) + '" text-anchor="middle" font-size="' + (21 + ((R() * 4) | 0)) + '" font-style="italic" transform="rotate(' + ((R() - 0.5) * 12).toFixed(1) + " " + T / 2 + " " + (T - 16) + ')" fill="' + C.night + '" style="filter:url(#tinta)">' + n + "</text></g></g>";
+    }
+    // Esquema de referencia
+    svg += '<text x="180" y="508" text-anchor="middle" font-size="9" letter-spacing="4" fill="' + C.cream2 + '">ASÍ DEBE QUEDAR</text>';
+    for (let p = 0; p < 9; p++) {
+      const rx = 138 + (p % 3) * 30, ry = 522 + ((p / 3) | 0) * 30;
+      svg += '<rect x="' + rx + '" y="' + ry + '" width="26" height="26" rx="2" fill="' + (META[p] ? C.kraft : "none") + '" stroke="' + C.kraftDk + '" stroke-width="1"/>' +
+        (META[p] ? '<text x="' + (rx + 13) + '" y="' + (ry + 18) + '" text-anchor="middle" font-size="13" fill="' + C.night + '">' + META[p] + "</text>" : "");
+    }
+    svg += '<g id="p2ok" style="opacity:0;transition:opacity .5s" pointer-events="none"><rect x="' + BX + '" y="' + (BY + 112) + '" width="292" height="68" fill="' + C.deep + '" opacity=".85"/>' +
+      '<text x="180" y="' + (BY + 154) + '" text-anchor="middle" font-size="20" letter-spacing="6" fill="' + C.pink + '">ABIERTO</text></g>';
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const fichas = {};
+    el.querySelectorAll(".p2t").forEach((g) => (fichas[g.getAttribute("data-i")] = g));
+    let resolver, hecho = false;
+    const ok = new Promise((r) => (resolver = r));
+
+    function pinta() {
+      b.forEach((n, p) => { if (n) { const q = pos(p); fichas[n].style.transform = "translate(" + q.x + "px," + q.y + "px)"; } });
+      wrap.dataset.tablero = b.join(",");
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const n = tocado(e);
+      if (n < 1) return;
+      const p = b.indexOf(n), v = b.indexOf(0);
+      const dx = Math.abs((p % 3) - (v % 3)), dy = Math.abs(((p / 3) | 0) - ((v / 3) | 0));
+      if (dx + dy !== 1) { Sonido.play("tick"); return; }
+      b[v] = n; b[p] = 0; Sonido.play("papel"); pinta();
+      if (b.every((x, i) => x === META[i])) {
+        hecho = true; Sonido.play("sello");
+        el.querySelector("#p2ok").style.opacity = 1;
+        setTimeout(() => resolver(), 1100);
+      }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Los sobres se mezclaron en el buzón.", 4200); }, destruir() {} };
+  }
+};
+
+// ===================================================================
+// PASO 3 · MEMORIA (sala 3) · encontrar los pares
+// ===================================================================
+const Paso3 = {
+  pistas: [
+    "Dos cartas iguales forman un par. Si no coinciden, se vuelven a esconder.",
+    "Fijate en el lugar de cada símbolo antes de que se tapen. Empezá por las esquinas.",
+    "Hay seis símbolos: luna, estrella, corazón, llave, sobre y bolsa. Cada uno aparece dos veces."
+  ],
+  construir() {
+    const NOMBRES = ["luna", "estrella", "corazon", "llave", "sobre", "bolsa"];
+    const CW = 92, CH = 112, GAP = 8, BX = 34, BY = 112;
+    const mazo = NOMBRES.concat(NOMBRES).sort(() => Math.random() - 0.5);
+
+    function dibujo(n) {
+      if (n === "sobre")
+        return '<rect x="-17" y="-11" width="34" height="22" fill="none" stroke="' + C.pinkDk + '" stroke-width="3"/><path d="M-17 -11 L0 3 L17 -11" fill="none" stroke="' + C.pinkDk + '" stroke-width="3"/>';
+      if (n === "bolsa")
+        return '<path d="M-14 -8 H14 L17 14 H-17 Z" fill="none" stroke="' + C.pinkDk + '" stroke-width="3" stroke-linejoin="round"/><path d="M-7 -8 V-14 H7 V-8" fill="none" stroke="' + C.pinkDk + '" stroke-width="3"/>';
+      return simbolo(n, 0, 0, 1.7, C.pinkDk);
+    }
+    let svg = fondoCierre(101);
+    svg += '<text x="180" y="96" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">ARCHIVO · ENCONTRAR LOS PARES</text>';
+    mazo.forEach((n, i) => {
+      const x = BX + (i % 3) * (CW + GAP), y = BY + ((i / 3) | 0) * (CH + GAP);
+      const R = rng(900 + i * 17);
+      svg += '<g transform="translate(' + (x + (R() * 4 - 2)).toFixed(1) + " " + (y + (R() * 4 - 2)).toFixed(1) + ") rotate(" + ((R() - 0.5) * 3.4).toFixed(1) + " " + CW / 2 + " " + CH / 2 + ')"><g class="p3c" data-i="' + i + '" style="transform-box:fill-box;transform-origin:center;transition:transform .14s linear">' +
+        '<g class="p3b"><rect width="' + CW + '" height="' + CH + '" rx="5" fill="' + C.pinkDk + '" stroke="' + C.pinkPl + '" stroke-width="2"/>' +
+        '<rect x="8" y="8" width="' + (CW - 16) + '" height="' + (CH - 16) + '" rx="3" fill="none" stroke="' + C.pinkPl + '" stroke-width="1.2" opacity=".7"/>' +
+        '<circle cx="' + (CW / 2 + (R() * 6 - 3)).toFixed(1) + '" cy="' + (CH / 2 + (R() * 6 - 3)).toFixed(1) + '" r="' + (7 + R() * 3).toFixed(1) + '" fill="' + C.pinkPl + '" opacity=".8"/>' +
+        mancha(10 + R() * 70, 14 + R() * 84, 8, C.wood, 0.16, 300 + i) + '</g>' +
+        '<g class="p3f" style="display:none"><rect width="' + CW + '" height="' + CH + '" rx="5" fill="' + C.cream + '" stroke="' + C.cream2 + '" stroke-width="2"/>' +
+        '<g transform="translate(' + CW / 2 + " " + CH / 2 + ') rotate(' + ((R() - 0.5) * 14).toFixed(1) + ')">' + dibujo(n) + "</g>" + mancha(70, 94, 9, C.kraftDk, 0.22, 400 + i) + "</g></g></g>";
+    });
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const cartas = [...el.querySelectorAll(".p3c")];
+    const volteada = mazo.map(() => false), resuelta = mazo.map(() => false);
+    let abiertas = [], bloqueo = false, parejas = 0, resolver, vivo = true;
+    const ok = new Promise((r) => (resolver = r));
+    wrap.dataset.mem = mazo.join(",");
+
+    function girar(i, arriba) {
+      const c = cartas[i];
+      c.style.transform = "scaleX(0)";
+      setTimeout(() => {
+        c.querySelector(".p3b").style.display = arriba ? "none" : "";
+        c.querySelector(".p3f").style.display = arriba ? "" : "none";
+        c.style.transform = "scaleX(1)";
+      }, 150);
+      volteada[i] = arriba;
+    }
+    el.addEventListener("pointerdown", (e) => {
+      const i = tocado(e);
+      if (i < 0 || bloqueo || volteada[i] || resuelta[i]) return;
+      Sonido.play("voltear"); girar(i, true); abiertas.push(i);
+      if (abiertas.length < 2) return;
+      const [a, b] = abiertas; abiertas = []; bloqueo = true;
+      if (mazo[a] === mazo[b]) {
+        resuelta[a] = resuelta[b] = true; parejas++;
+        setTimeout(() => {
+          Sonido.play("par"); bloqueo = false;
+          if (parejas === NOMBRES.length) { Sonido.play("sello"); setTimeout(() => vivo && resolver(), 900); }
+        }, 450);
+      } else {
+        setTimeout(() => { if (!vivo) return; girar(a, false); girar(b, false); setTimeout(() => (bloqueo = false), 330); }, 850);
+      }
+    });
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Seis pares, todos mezclados en el archivo.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// PASO 4 · SECUENCIA DE LA RADIO (sala 4) · repetir la melodía
+// ===================================================================
+const Paso4 = {
+  pistas: [
+    "La radio toca una melodía de cuatro notas de colores. Escuchala y repetila tocando los botones.",
+    "Si te equivocás, la melodía se repite igual desde el principio. No cambia.",
+    "Podés tocar REPETIR para volver a escuchar. Acordate del orden de los colores, no de los sonidos."
+  ],
+  construir() {
+    const COL = [C.amber, C.cream, C.blue, C.pink];
+    const TON = [330, 392, 494, 587];
+    const RONDAS = [3, 4, 5, 6];
+    const secuencia = Array.from({ length: 6 }, () => (Math.random() * 4) | 0);
+    const PX = [46, 184], PY = [236, 372], PS = 130;
+
+    let svg = '<rect x="-80" y="-20" width="520" height="780" fill="' + C.night + '"/>';
+    svg += '<g filter="url(#mano)"><rect x="22" y="86" width="316" height="566" rx="22" fill="' + C.wood + '" stroke="#2a2030" stroke-width="2"/>' +
+      vetas(24, 90, 312, 60, 4, "#2a2030", 0.5, 111) + vetas(24, 600, 312, 48, 4, "#2a2030", 0.5, 112) +
+      '<rect x="36" y="100" width="288" height="538" rx="14" fill="' + C.night2 + '"/></g>' +
+      '<text x="180" y="124" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">REPETIR LA MELODÍA</text>' +
+      '<rect x="60" y="140" width="240" height="44" rx="6" fill="' + C.deep + '"/>' +
+      '<text id="p4txt" x="180" y="168" text-anchor="middle" font-size="14" letter-spacing="5" fill="' + C.pink + '">ESCUCHÁ</text>';
+    for (let r = 0; r < 4; r++) svg += '<circle class="p4d" cx="' + (150 + r * 20) + '" cy="208" r="5" fill="' + C.night3 + '"/>';
+    for (let k = 0; k < 4; k++) {
+      const x = PX[k % 2], y = PY[(k / 2) | 0];
+      svg += '<g class="p4p" data-i="' + k + '" style="transition:opacity .08s"><rect x="' + x + '" y="' + y + '" width="' + PS + '" height="' + PS + '" rx="12" fill="' + COL[k] + '" opacity=".38" class="p4r" stroke="' + COL[k] + '" stroke-width="2"/></g>';
+    }
+    svg += '<g data-i="9" class="p4rep"><rect x="116" y="534" width="128" height="40" rx="6" fill="none" stroke="' + C.cream2 + '" stroke-width="1.5"/>' +
+      '<text x="180" y="560" text-anchor="middle" font-size="12" letter-spacing="5" fill="' + C.cream2 + '">REPETIR</text></g>';
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const rects = [...el.querySelectorAll(".p4r")];
+    const puntos = [...el.querySelectorAll(".p4d")];
+    const txt = el.querySelector("#p4txt");
+    let ronda = 0, indice = 0, turno = false, vivo = true, resolver, tokenReprod = 0;
+    const ok = new Promise((r) => (resolver = r));
+    wrap.dataset.seq = secuencia.join(",");
+
+    function estado(t) { txt.textContent = t; wrap.dataset.estado = t === "TU TURNO" ? "turno" : "escucha"; }
+    function luz(k, on) { rects[k].setAttribute("opacity", on ? 1 : 0.38); }
+    async function sonar(k, ms) {
+      luz(k, true); Sonido.nota(TON[k]);
+      await sleep(ms || 380); luz(k, false); await sleep(160);
+    }
+    async function reproducir() {
+      const mi = ++tokenReprod; turno = false; indice = 0; estado("ESCUCHÁ");
+      await sleep(650);
+      for (let i = 0; i < RONDAS[ronda]; i++) {
+        if (!vivo || mi !== tokenReprod) return;
+        await sonar(secuencia[i]);
+      }
+      if (vivo && mi === tokenReprod) { turno = true; estado("TU TURNO"); }
+    }
+    el.addEventListener("pointerdown", async (e) => {
+      const k = tocado(e);
+      if (k < 0) return;
+      if (k === 9) { if (turno || wrap.dataset.estado === "turno") reproducir(); return; }
+      if (!turno) return;
+      sonar(k, 240);
+      if (k !== secuencia[indice]) {
+        turno = false; Sonido.play("error"); estado("OTRA VEZ");
+        await sleep(900); if (vivo) reproducir(); return;
+      }
+      indice++;
+      if (indice < RONDAS[ronda]) return;
+      turno = false; puntos[ronda].setAttribute("fill", C.pink); ronda++;
+      if (ronda >= RONDAS.length) {
+        estado("SEÑAL FIJADA"); Sonido.play("sello");
+        setTimeout(() => vivo && resolver(), 1200); return;
+      }
+      Sonido.play("par"); estado("BIEN");
+      await sleep(900); if (vivo) reproducir();
+    });
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("La radio repite una melodía. Hay que devolvérsela.", 4200); reproducir(); }, destruir() { vivo = false; } };
+  }
+};
+
+const PASOS2 = [Paso1, Paso2, Paso3, Paso4];
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ ///////////////////  ESCENA FINAL (EL CÓDIGO)  /////////////////////
+ ////////////////////////////////////////////////////////////////////
+ Es el único lugar donde el código completo aparece en pantalla, y solo
+ después de haber resuelto las cuatro salas.
+*/
+
+const Final = {
+
+  construir() {
+    const cx = 190;                // centro de la caja
+    const n = CONFIG.CODIGO.length;
+    const anchoCelda = 54, sep = 12;
+    const total = n * anchoCelda + (n - 1) * sep;
+    const x0 = 180 - total / 2;
+
+    let svg = "";
+    svg += '<rect x="-80" y="-20" width="520" height="780" fill="' + C.night + '"/>';
+
+    // Haz de luz y halos planos
+    svg += '<polygon points="148,-20 212,-20 330,540 30,540" fill="' + C.pink + '" opacity=".06"/>' +
+           '<circle cx="' + cx + '" cy="470" r="230" fill="' + C.pink + '" opacity=".04"/>' +
+           '<circle cx="' + cx + '" cy="470" r="165" fill="' + C.pink + '" opacity=".05"/>' +
+           '<circle cx="' + cx + '" cy="470" r="105" fill="' + C.pink + '" opacity=".06"/>';
+
+    // Estrellas pequeñas arriba
+    [[40,130],[310,110],[270,170],[70,190],[330,220],[24,260]].forEach((p, i) => {
+      svg += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (1 + (i % 2)) + '" fill="' + C.pinkPl + '" opacity=".6"/>';
+    });
+
+    // Mesa
+    svg += '<g filter="url(#mano)"><rect x="-80" y="540" width="520" height="260" fill="' + C.wood2 + '"/><rect x="-80" y="540" width="520" height="5" fill="' + C.wood3 + '"/>' +
+           vetas(-60, 550, 500, 150, 8, "#2a2030", 0.38, 81) + anillo(70, 580, 18, 5, C.kraftDk, 0.5) + "</g>";
+
+    // Caja física
+    svg += '<g id="fbox" filter="url(#mano)">' +
+      '<rect x="' + (cx - 88) + '" y="448" width="176" height="92" fill="' + C.kraft + '"/>' +
+      '<rect x="' + (cx - 88) + '" y="448" width="176" height="8" fill="' + C.kraftDk + '"/>' +
+      '<rect x="' + (cx - 96) + '" y="420" width="192" height="32" fill="' + C.wood3 + '"/>' +
+      '<rect x="' + (cx - 96) + '" y="420" width="192" height="5" fill="' + C.cream2 + '" opacity=".3"/>' +
+      '<rect x="' + (cx - 7) + '" y="420" width="14" height="120" fill="' + C.pink + '"/>' +
+      // candado
+      '<g id="fpad">' +
+        '<path id="fshackle" d="M' + (cx - 10) + ' 452 v-16 a10 10 0 0 1 20 0 v16" fill="none" stroke="' + C.amber + '" stroke-width="5" style="transition:transform 1.2s cubic-bezier(.3,.7,.2,1)"/>' +
+        '<rect x="' + (cx - 17) + '" y="450" width="34" height="28" rx="4" fill="' + C.amber + '"/>' +
+        '<circle cx="' + cx + '" cy="461" r="4" fill="' + C.amberDk + '"/><rect x="' + (cx - 1.5) + '" y="461" width="3" height="10" fill="' + C.amberDk + '"/>' +
+      '</g>' +
+      '</g>';
+
+    // Polvo flotando
+    svg += '<g class="dust" fill="' + C.pinkPl + '">';
+    for (let i = 0; i < 9; i++) {
+      const x = 60 + i * 30 + (i % 3) * 7, y = 520 - (i % 4) * 14, d = 5 + (i % 4) * 1.6, dl = -(i * 0.9);
+      svg += '<circle cx="' + x + '" cy="' + y + '" r="' + (1.2 + (i % 3) * 0.5) + '" style="animation-duration:' + d + "s;animation-delay:" + dl + 's"/>';
+    }
+    svg += "</g>";
+
+    // Foto opcional (solo si el archivo existe)
+    svg += '<g id="ffoto"></g>';
+
+    // Celdas del código (vacías hasta el momento de revelar)
+    svg += '<g id="fcode" transform="translate(0 270)">';
+    for (let i = 0; i < n; i++) {
+      svg += '<g class="fcell" data-i="' + i + '" style="transform-origin:' + (x0 + i * (anchoCelda + sep) + anchoCelda / 2) + 'px 35px;transition:transform .5s cubic-bezier(.2,1.5,.4,1)">' +
+        '<rect x="' + (x0 + i * (anchoCelda + sep)) + '" y="0" width="' + anchoCelda + '" height="70" rx="4" fill="' + C.night2 + '" stroke="' + C.pink + '" stroke-width="2" opacity=".0" class="fbg" style="transition:opacity .6s"/>' +
+        '<text class="ftxt" x="' + (x0 + i * (anchoCelda + sep) + anchoCelda / 2) + '" y="52" text-anchor="middle" font-size="44" font-weight="bold" fill="' + C.pinkPl + '"></text>' +
+        "</g>";
+    }
+    svg += "</g>";
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+
+    // Foto final (opcional)
+    const foto = new Image();
+    foto.onload = () => {
+      el.querySelector("#ffoto").innerHTML =
+        '<g transform="rotate(-7 52 520)"><rect x="14" y="456" width="82" height="96" fill="' + C.cream + '"/>' +
+        '<image href="' + CONFIG.FOTOS.final + '" x="19" y="461" width="72" height="72" preserveAspectRatio="xMidYMid slice"/></g>';
+    };
+    foto.src = CONFIG.FOTOS.final;
+
+    // Texto narrado (HTML por encima de la escena)
+    const texto = h("div", "final-text");
+    const firma = h("div", "final-firma");
+    wrap.appendChild(texto); wrap.appendChild(firma);
+
+    return { el: wrap, svg: el, texto, firma, n };
+  },
+
+  // Secuencia cinematográfica completa
+  async reproducir(esc) {
+    const F = CONFIG.TEXTOS.final.map(fill);
+    const antes = F.slice(0, 2), despues = F.slice(2);
+    const skip = esc.el;
+
+    const decir = async (t, pausa) => {
+      await typeInto(esc.texto, t, 48, skip);
+      await sleep((pausa || 1800) + 900);
+    };
+
+    await sleep(1400);
+    Sonido.play("puerta");
+    for (const t of antes) await decir(t, 1700);
+
+    // Revelar el código, dígito por dígito
+    esc.svg.querySelectorAll(".fbg").forEach((r) => (r.style.opacity = "1"));
+    await sleep(700);
+    const celdas = esc.svg.querySelectorAll(".fcell");
+    for (let i = 0; i < celdas.length; i++) {
+      celdas[i].querySelector(".ftxt").textContent = CONFIG.CODIGO[i];
+      celdas[i].style.transform = "scale(1.25)";
+      Sonido.play("candado");
+      await sleep(120);
+      celdas[i].style.transform = "scale(1)";
+      await sleep(850);
+    }
+    await sleep(500);
+    Sonido.play("final");
+    esc.svg.querySelector("#fshackle").style.transform = "translateY(-9px)";
+    await sleep(2400);
+
+    for (let i = 0; i < despues.length; i++) {
+      const ultimo = i === despues.length - 1;
+      await decir(despues[i], ultimo ? 600 : 2200);
+    }
+    if (CONFIG.FIRMA) {
+      esc.firma.textContent = "— " + CONFIG.FIRMA;
+      esc.firma.classList.add("on");
+    }
+  }
+};
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ //////////////  FLUJO PRINCIPAL: PORTADA → SALAS → FINAL  //////////
+ ////////////////////////////////////////////////////////////////////
+*/
+
+const SALAS = [Sala1, Sala2, Sala3, Sala4];
+
+// ===================================================================
+// PORTADA
+// ===================================================================
+function portada() {
+  return new Promise((resolve) => {
+    const st = State.get();
+    const hayProgreso = st.iniciado || st.resueltas.some(Boolean);
+
+    let lluvia = "";
+    for (let i = 0; i < 46; i++) {
+      const x = Math.round(Math.random() * 380 - 10), y = Math.round(Math.random() * 720);
+      const d = (0.55 + Math.random() * 0.6).toFixed(2), dl = (-Math.random() * 2).toFixed(2);
+      lluvia += '<line x1="' + x + '" y1="' + y + '" x2="' + (x - 2) + '" y2="' + (y + 12) + '" style="animation-duration:' + d + "s;animation-delay:" + dl + 's"/>';
+    }
+
+    // Ciudad al fondo: edificios planos con ventanas encendidas
+    let ciudad = "";
+    const edif = [[-10,70,46],[40,110,36],[82,84,40],[128,128,34],[168,96,44],[216,120,38],[258,80,42],[304,104,44]];
+    edif.forEach((e, i) => {
+      ciudad += '<rect x="' + e[0] + '" y="' + (720 - e[1]) + '" width="' + e[2] + '" height="' + e[1] + '" fill="' + (i % 2 ? C.night2 : "#1f2640") + '"/>';
+      for (let w = 0; w < 5; w++) {
+        if ((i * 7 + w * 3) % 4 === 0) ciudad += '<rect x="' + (e[0] + 8 + (w % 2) * 14) + '" y="' + (720 - e[1] + 12 + w * 16) + '" width="5" height="6" fill="' + C.amber + '" opacity=".8"/>';
+      }
+    });
+    const sobre =
+      '<svg class="cover-env" viewBox="0 0 96 70" width="96" height="70">' +
+      '<rect x="2" y="6" width="92" height="60" rx="3" fill="' + C.cream + '"/>' +
+      '<path d="M2 9 L48 40 L94 9" fill="none" stroke="' + C.cream2 + '" stroke-width="3" stroke-linejoin="round"/>' +
+      '<circle cx="48" cy="40" r="9" fill="' + C.pink + '"/><circle cx="48" cy="40" r="4.5" fill="none" stroke="' + C.pinkDk + '" stroke-width="1.5"/></svg>';
+
+    const cover = h("div", "cover",
+      '<svg class="rain-bg" viewBox="0 0 360 720" preserveAspectRatio="xMidYMid slice"><g>' + ciudad + '</g><g class="rain">' + lluvia + "</g></svg>" +
+      sobre +
+      '<div class="k"></div><div class="line"></div><h1></h1><div class="note"></div>' +
+      '<button class="btn">' + (hayProgreso ? "Continuar" : "Entrar") + "</button>");
+    cover.querySelector(".k").textContent = fill(CONFIG.TEXTOS.portadaKicker);
+    cover.querySelector("h1").textContent = CONFIG.TEXTOS.portadaTitulo;
+    cover.querySelector(".note").textContent = CONFIG.TEXTOS.portadaNota;
+
+    const wrap = h("div", "scene");
+    wrap.appendChild(cover);
+    UI.showScene(wrap);
+    cover.querySelector("button").addEventListener("click", () => {
+      Sonido.init();            // el audio solo puede arrancar con un toque
+      Sonido.play("tap");
+      resolve();
+    });
+  });
+}
+
+// ===================================================================
+// INTRODUCCIÓN (solo la primera vez)
+// ===================================================================
+async function introduccion() {
+  UI.bars(true);
+  const wrap = h("div", "scene",
+    '<div class="intro-wrap"><div class="intro-text"></div><div class="intro-sub">Tocá para continuar</div><button class="btn">Empezar</button></div>');
+  UI.showScene(wrap);
+  const box = wrap.querySelector(".intro-wrap");
+  const txt = wrap.querySelector(".intro-text");
+  const sub = wrap.querySelector(".intro-sub");
+  const btn = wrap.querySelector("button");
+  const lineas = CONFIG.TEXTOS.intro.map(fill);
+
+  await sleep(1500);
+  for (let i = 0; i < lineas.length; i++) {
+    sub.classList.remove("on");
+    await typeInto(txt, lineas[i], 52, box);
+    await sleep(1100);
+    if (i < lineas.length - 1) {
+      sub.classList.add("on");
+      await waitTap(box);
+    }
+  }
+  btn.classList.add("on");
+  await new Promise((r) => btn.addEventListener("click", () => { Sonido.play("tap"); r(); }));
+  State.set("iniciado", true);
+}
+
+// ===================================================================
+// UNA SALA
+// ===================================================================
+async function jugarSala(i) {
+  const S = SALAS[i], P2 = PASOS2[i];
+  UI.hudShow(false);
+  UI.hush();
+  let paso = State.paso(i);                 // 0 = primer desafío, 1 = segundo
+  let sala = paso === 0 ? S.construir() : P2.construir();
+
+  await UI.titleCard(S.kicker, S.titulo, () => {
+    UI.bars(false);
+    UI.showScene(sala.el);
+    Sonido.setRainMuffle(false);
+  });
+
+  UI.hudShow(true);
+  UI.updateTray();
+
+  if (paso === 0) {
+    UI.setupHints(i * 2, S.pistas);
+    sala.alEntrar();
+    await sala.resuelto;                    // no avanza hasta resolver la prueba
+    UI.stopHints();
+    sala.destruir();
+    State.setPaso(i, 1);
+    Sonido.play("chime");
+    await UI.fade(true, 700);
+    sala = P2.construir();
+    UI.showScene(sala.el);
+    await UI.fade(false, 900);
+  }
+
+  UI.setupHints(i * 2 + 1, P2.pistas);
+  sala.alEntrar();
+  await sala.resuelto;
+
+  State.resolver(i);                        // el progreso queda guardado
+  UI.stopHints();
+  sala.destruir();
+  Sonido.play("chime");
+  await sleep(900);
+  await UI.cartaSube();
+  const txt = fill(CONFIG.TEXTOS.cartas[i]);
+  await UI.card("Carta del cartero", txt, 2500 + txt.replace(/<[^>]*>/g, "").length * 45);
+  await sleep(300);
+  if (i < CONFIG.CODIGO.length) await UI.revealDigit(i, CONFIG.CODIGO[i], i === 2 ? CONFIG.FOTOS.sala3 : undefined);
+}
+
+// ===================================================================
+// FINAL
+// ===================================================================
+async function finale() {
+  UI.hudShow(false);
+  UI.stopHints();
+  UI.hush();
+  UI.bars(true);
+  await UI.fade(true, 1600);
+  const esc = Final.construir();
+  UI.showScene(esc.el);
+  await UI.fade(false, 2200);
+  State.set("terminado", true);
+  await Final.reproducir(esc);
+}
+
+// ===================================================================
+// ARRANQUE
+// ===================================================================
+async function main() {
+  UI.mount();
+  prepararDev();
+  await portada();
+
+  const st = State.get();
+  if (st.terminado) {
+    await finale();
+    return;
+  }
+  if (!st.iniciado && !st.resueltas.some(Boolean)) {
+    await introduccion();
+  }
+  for (let i = State.salaActual(); i < SALAS.length; i++) {
+    await jugarSala(i);
+  }
+  await finale();
+}
+
+// ===================================================================
+// PANEL DE PRUEBAS: se abre agregando #dev al final del enlace.
+// Sirve para probar salas sueltas y borrar el progreso.
+// ===================================================================
+function prepararDev() {
+  if (location.hash !== "#dev") return;
+  const d = document.getElementById("dev");
+  d.classList.remove("hidden");
+  const mk = (txt, fn) => { const b = h("button", "", txt); b.addEventListener("click", fn); d.appendChild(b); };
+  const ir = (hasta, terminado) => {
+    State.reset();
+    for (let k = 0; k < hasta; k++) State.resolver(k);
+    State.set("iniciado", true);
+    State.set("terminado", !!terminado);
+    location.reload();
+  };
+  mk("Sala 1", () => ir(0));
+  mk("Sala 2", () => ir(1));
+  mk("Sala 3", () => ir(2));
+  mk("Sala 4", () => ir(3));
+  mk("Final", () => ir(4));
+  [0, 1, 2, 3].forEach((k) => mk("Paso 2 · S" + (k + 1), () => { ir(k); State.setPaso(k, 1); location.reload(); }));
+  mk("Reiniciar todo", () => { State.reset(); State.set("iniciado", false); location.reload(); });
+}
+
+main();
+
+</script>
+</body>
+</html>
