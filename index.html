@@ -404,6 +404,9 @@ const CONFIG = {
   ////////////////////////////////////////////////////////////////////
   NOMBRE: "Sofía",
   FIRMA:  "Ju",                // aparece al final del mensaje. Dejar "" para ocultarla.
+  // MODO DIFÍCIL: lo activa el build de la versión difícil (no tocar a mano)
+  DIFICIL: true,
+
   FECHA_NOVIOS: "14/12",       // se ve grabada en el sello rosa (sala 2)
   FRASE_SECRETA: "OYE SI",     // la frase que se descifra en el archivo (sala 3). En mayúsculas, sin tildes.
   // (La sala 3 se cifra con FECHA_NOVIOS: cada letra de FRASE_SECRETA usa un número de la fecha.)
@@ -878,17 +881,17 @@ const Sonido = (function () {
  ////////////////////////////////////////////////////////////////////
  Cada sala tiene 2 pasos. `pasos[i]` indica cuántos pasos de la sala i
  ya están hechos mientras la sala todavía no está resuelta.
- `pistas` tiene 8 casillas: sala*2 + paso.
+ `pistas` tiene 16 casillas: sala*4 + paso.
 */
 
 const State = (function () {
-  const KEY = "oficina-correspondencia-v2";
+  const KEY = CONFIG.DIFICIL ? "oficina-correspondencia-dificil-v1" : "oficina-correspondencia-v2";
   const nuevo = () => ({
     iniciado: false,
     resueltas: [false, false, false, false],
     pasos: [0, 0, 0, 0],
     terminado: false,
-    pistas: [0, 0, 0, 0, 0, 0, 0, 0]
+    pistas: new Array(16).fill(0)
   });
   let mem = null;
 
@@ -1075,7 +1078,7 @@ const UI = (function () {
     stopHints();
     hintSt.room = room; hintSt.list = list;
     hintSt.used = State.get().pistas[room] || 0;
-    hintSt.cdEnd = Date.now() + (hintSt.used ? 10000 : 28000);
+    hintSt.cdEnd = Date.now() + (hintSt.used ? 10000 : 28000) * (CONFIG.DIFICIL ? 3 : 1);
     hintSt.timer = setInterval(refreshHint, 500);
     refreshHint();
   }
@@ -1103,7 +1106,7 @@ const UI = (function () {
     // Entrega una pista nueva
     hintSt.used++;
     State.pista(hintSt.room, hintSt.used);
-    hintSt.cdEnd = Date.now() + 22000;
+    hintSt.cdEnd = Date.now() + 22000 * (CONFIG.DIFICIL ? 3 : 1);
     refreshHint();
     openHints(true);
   }
@@ -1189,7 +1192,7 @@ const UI = (function () {
   async function penalizar() {
     fallos++;
     if (fallos < 2) return;
-    const seg = Math.min(45, (fallos - 1) * 10);
+    const seg = CONFIG.DIFICIL ? Math.min(120, (fallos - 1) * 20) : Math.min(45, (fallos - 1) * 10);
     const capa = h("div", "lockout",
       '<div class="lk-t">El mecanismo se trabó</div><div class="lk-n"></div><div class="lk-s">Mirá bien las pistas antes de volver a probar.</div>');
     app.appendChild(capa);
@@ -1910,10 +1913,9 @@ const Sala2 = {
  ////////////  SALA 3 · EL ARCHIVO (DISCO DE CIFRADO)  //////////////
  ////////////////////////////////////////////////////////////////////
  Mecánica: un papel con letras sin sentido y un disco de dos anillos.
- La llave es la fecha de novios (CONFIG.FECHA_NOVIOS, ej. 14/12 → 1,4,1,2).
- Cada letra de la frase se cifra con un número de la fecha, en orden, y la
- fecha vuelve a empezar. Para cada letra hay que girar el disco hasta ese
- número, traducir la letra y tocar FIJAR. Equivocarse traba el mecanismo.
+ Cada letra del anillo fijo lleva un número al azar (1 a 26). Para cada
+ letra del papel hay que girar la rueda hasta su número y tocar FIJAR; la
+ letra verdadera aparece sola. Equivocarse solo sacude el disco.
 */
 
 const Sala3 = {
@@ -1921,9 +1923,9 @@ const Sala3 = {
   kicker: "Sala 3",
   titulo: "El archivo",
   pistas: [
-    "El papel está escrito en clave. Cada letra del anillo interior corresponde a otra letra del anillo exterior.",
-    "Leé la nota del cartero: la llave es la fecha en que se hicieron novios, sin la barra. Cada número es una posición del disco.",
-    "Girá el anillo interior (o usá las flechas de los costados) hasta el primer número de la fecha (" + CONFIG.FECHA_NOVIOS.replace(/\D/g, "").split("").join(", ") + "), traducí la letra marcada en rosa y tocá FIJAR. Seguí con el siguiente número."
+    "El papel está escrito en clave. Mirá la letra marcada en rosa y buscala en el anillo de afuera del disco: tiene un número chiquito al lado.",
+    "Girá el disco hasta ese número. Lo ves en el centro del disco, en POSICIÓN. Cuando coincida, tocá FIJAR y aparece la letra verdadera.",
+    "Hacelo letra por letra, de izquierda a derecha, siempre con la que está marcada en rosa. Cada letra tiene su propio número."
   ],
 
   construir() {
@@ -1939,6 +1941,14 @@ const Sala3 = {
     const letras = [];
     frase.split("").forEach((ch, i) => { if (ch !== " ") letras.push({ pos: i, ch, k: claves[letras.length % claves.length] }); });
     const cifrado = frase.split("").map((ch, i) => { const l = letras.find((x) => x.pos === i); return l ? rot(ch, l.k) : ch; }).join("");
+
+    // Cada letra del anillo fijo lleva un número distinto del 1 al 26, al azar
+    const NUMS = {};
+    {
+      const pool = Array.from({ length: 26 }, (_, i) => i + 1);
+      for (let i = pool.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [pool[i], pool[j]] = [pool[j], pool[i]]; }
+      ABC.split("").forEach((ch, i) => (NUMS[ch] = pool[i]));
+    }
 
     let svg = "";
 
@@ -1990,7 +2000,7 @@ const Sala3 = {
     const tam = cifrado.length <= 8 ? 28 : cifrado.length <= 12 ? 21 : 15;
     svg += '<g filter="url(#mano)" transform="rotate(-1.2 180 340)">' +
       '<rect x="34" y="304" width="292" height="84" fill="' + C.cream + '"/>' +
-      '<text x="180" y="322" text-anchor="middle" font-size="9" letter-spacing="3" fill="' + C.night3 + '">MENSAJE INTERCEPTADO</text>' +
+      '<text id="s3win" x="180" y="322" text-anchor="middle" font-size="9" letter-spacing="2" fill="' + C.night3 + '">MENSAJE INTERCEPTADO</text>' +
       '<text id="s3cipher" x="180" y="354" text-anchor="middle" font-size="' + tam + '" letter-spacing="5" font-weight="bold" fill="' + C.night + '">' +
         cifrado.split("").map((ch, i) => '<tspan data-p="' + i + '">' + (ch === " " ? "\u00a0" : ch) + "</tspan>").join("") + "</text>" +
       '<text id="s3plain" x="180" y="379" text-anchor="middle" font-size="14" letter-spacing="4" fill="' + C.pinkDk + '"></text>' +
@@ -2006,7 +2016,8 @@ const Sala3 = {
       '<circle cx="' + CX + '" cy="' + CY + '" r="' + RO + '" fill="' + C.night3 + '" stroke="' + C.cream2 + '" stroke-width="1.5"/>';
     for (let j = 0; j < 26; j++) {
       const a = j * PASO;
-      svg += '<text x="' + CX + '" y="' + (CY - 92) + '" text-anchor="middle" font-size="11.5" font-weight="bold" fill="' + C.cream + '" transform="rotate(' + a.toFixed(2) + " " + CX + " " + CY + ')">' + ABC[j] + "</text>";
+      svg += '<text class="s3o" data-l="' + ABC[j] + '" x="' + CX + '" y="' + (CY - 92) + '" text-anchor="middle" font-size="11.5" font-weight="bold" fill="' + C.cream + '" transform="rotate(' + a.toFixed(2) + " " + CX + " " + CY + ')">' + ABC[j] + "</text>" +
+        '<text class="s3n" data-l="' + ABC[j] + '" x="' + CX + '" y="' + (CY - 82) + '" text-anchor="middle" font-size="8" fill="' + C.cream2 + '" transform="rotate(' + a.toFixed(2) + " " + CX + " " + CY + ')">' + NUMS[ABC[j]] + "</text>";
       svg += '<rect x="' + (CX - 0.7) + '" y="' + (CY - RO) + '" width="1.4" height="7" fill="' + C.cream2 + '" opacity=".5" transform="rotate(' + (a + PASO / 2).toFixed(2) + " " + CX + " " + CY + ')"/>';
     }
     // Anillo interior giratorio
@@ -2020,7 +2031,7 @@ const Sala3 = {
     svg += "</g>" +
       '<circle cx="' + CX + '" cy="' + CY + '" r="41" fill="' + C.night + '" stroke="' + C.pink + '" stroke-width="1.5"/>' +
       '<text x="' + CX + '" y="' + (CY - 12) + '" text-anchor="middle" font-size="7.5" letter-spacing="2.4" fill="' + C.cream2 + '">POSICIÓN</text>' +
-      '<text id="s3pos" x="' + CX + '" y="' + (CY + 16) + '" text-anchor="middle" font-size="30" font-weight="bold" fill="' + C.pink + '">0</text>' +
+      '<text id="s3pos" x="' + CX + '" y="' + (CY + 16) + '" text-anchor="middle" font-size="30" font-weight="bold" fill="' + C.pink + '">1</text>' +
       '<polygon points="' + (CX - 7) + "," + (CY - RO - 9) + " " + (CX + 7) + "," + (CY - RO - 9) + " " + CX + "," + (CY - RO + 3) + '" fill="' + C.pink + '"/>' +
       "</g>";
 
@@ -2043,12 +2054,16 @@ const Sala3 = {
 
     function actualizar() {
       $("s3inner").style.transform = "rotate(" + (s * PASO) + "deg)";
-      $("s3pos").textContent = s;
+      $("s3pos").textContent = s + 1;
       pinta();
     }
     // Línea de progreso: letras ya traducidas y puntos por las que faltan
     let hechas = 0;
+    function visor() {
+      $("s3win").textContent = hechas < letras.length ? "CADA LETRA TIENE SU NÚMERO EN EL DISCO" : "MENSAJE INTERCEPTADO";
+    }
     function pinta() {
+      visor();
       $("s3plain").textContent = frase.split("").map((ch, i) => {
         if (ch === " ") return "\u00a0\u00a0";
         const n = letras.findIndex((x) => x.pos === i);
@@ -2068,7 +2083,7 @@ const Sala3 = {
       Sonido.play("tap");
       await sleep(350);
       const actual = letras[hechas];
-      if (s === actual.k) {
+      if (s + 1 === NUMS[cifrado[actual.pos]]) {
         hechas++; Sonido.play("par"); pinta();
         if (hechas === letras.length) { terminar(); return; }
         UI.say("Una letra menos. Ahora, la siguiente.", 2600);
@@ -2076,9 +2091,8 @@ const Sala3 = {
       }
       Sonido.play("error");
       UI.shake($("s3inner"));
-      UI.say("Con ese número la letra no cobra sentido. Esa no es la posición.", 3600);
-      await sleep(500);
-      await UI.penalizar();
+      UI.say("Ese no es el número de esa letra. Mirá bien el disco.", 3600);
+      await sleep(900);
       fijando = false;
     }
 
@@ -2117,9 +2131,8 @@ const Sala3 = {
     // ---------- Objetos ----------
     $("s3note").addEventListener("click", () =>
       UI.card("Nota del cartero",
-        "«Mi llave es una fecha: el día en que nos hicimos novios, sin la barra. " +
-        "Cada letra usa un número de esa fecha, en orden. Cuando se acaba la fecha, vuelve a empezar. " +
-        "Poné el disco en ese número, traducí la letra con los dos anillos y fijala.»"));
+        "«Cada letra de ese papel tiene un número en el disco. Poné la rueda en ese número y fijala: " +
+        "la letra verdadera aparece sola. Así, de a una.»"));
     el.querySelectorAll(".s3dr").forEach((g) => {
       g.addEventListener("click", () => {
         if (resuelto) return;
@@ -2265,7 +2278,7 @@ const Sala4 = {
       const df = Math.abs(freq() - F0);
       const dp = Math.abs(mod(fase() - P0 + Math.PI, Math.PI * 2) - Math.PI);
       const c = Math.max(0, 1 - df / 1.5) * Math.max(0, 1 - dp / 1.9);
-      return { c, ok: df <= 0.15 && dp <= 0.22 };
+      return { c, ok: df <= (CONFIG.DIFICIL ? 0.12 : 0.15) && dp <= (CONFIG.DIFICIL ? 0.18 : 0.22) };
     }
 
     let radio = null, mantener = 0, ultimo = { c: 0, ok: false };
@@ -2309,7 +2322,7 @@ const Sala4 = {
       dibujar();   // refresca la estática
       if (ultimo.ok) {
         mantener += 70;
-        if (mantener >= 1800) fijar();
+        if (mantener >= (CONFIG.DIFICIL ? 2600 : 1800)) fijar();
       } else mantener = 0;
     }, 70);
 
@@ -2458,32 +2471,34 @@ const Paso1 = {
 // ===================================================================
 const Paso2 = {
   pistas: [
-    "Los sobres tienen que quedar numerados del 1 al 8. Tocá uno al lado del hueco para deslizarlo.",
-    "Armá primero la fila de arriba (1, 2, 3). Después la del medio. La última fila se resuelve sola.",
+    "Los sobres tienen que quedar numerados en orden, de izquierda a derecha y de arriba abajo. Tocá uno al lado del hueco para deslizarlo.",
+    "Armá primero la fila de arriba. Después la siguiente. Las dos últimas filas se resuelven juntas, con paciencia.",
     "Mirá el esquema pequeño de abajo: así debe quedar. Si te trabás, deshacé el último movimiento antes de seguir."
   ],
   construir() {
-    const T = 92, G = 8, BX = 34, BY = 150;
-    const META = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+    const D = false, N = 3;
+    const T = D ? 68 : 92, G = D ? 6 : 8, BY = 150;
+    const HB = N * T + (N - 1) * G, BX = (360 - HB) / 2;
+    const META = Array.from({ length: N * N }, (_, i) => (i < N * N - 1 ? i + 1 : 0));
     // Mezcla con movimientos válidos (siempre tiene solución)
-    let b = META.slice(), vacio = 8, previo = -1;
-    for (let k = 0; k < 40 || b.every((v, i) => v === META[i]); k++) {
-      const x = vacio % 3, y = (vacio / 3) | 0, vec = [];
+    let b = META.slice(), vacio = N * N - 1, previo = -1;
+    for (let k = 0; k < (D ? 160 : 40) || b.every((v, i) => v === META[i]); k++) {
+      const x = vacio % N, y = (vacio / N) | 0, vec = [];
       if (x > 0) vec.push(vacio - 1);
-      if (x < 2) vec.push(vacio + 1);
-      if (y > 0) vec.push(vacio - 3);
-      if (y < 2) vec.push(vacio + 3);
+      if (x < N - 1) vec.push(vacio + 1);
+      if (y > 0) vec.push(vacio - N);
+      if (y < N - 1) vec.push(vacio + N);
       const op = vec.filter((v) => v !== previo);
       const n = op[(Math.random() * op.length) | 0];
       b[vacio] = b[n]; b[n] = 0; previo = vacio; vacio = n;
     }
-    const pos = (p) => ({ x: BX + (p % 3) * (T + G), y: BY + ((p / 3) | 0) * (T + G) });
+    const pos = (p) => ({ x: BX + (p % N) * (T + G), y: BY + ((p / N) | 0) * (T + G) });
 
     let svg = fondoCierre(91);
     svg += '<text x="180" y="108" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">BUZÓN · ORDENAR LOS SOBRES</text>';
-    svg += '<rect x="' + (BX - 8) + '" y="' + (BY - 8) + '" width="' + (3 * T + 2 * G + 16) + '" height="' + (3 * T + 2 * G + 16) + '" rx="6" fill="' + C.deep + '" opacity=".6"/>';
-    for (let n = 1; n <= 8; n++) {
-      const R = rng(700 + n * 31), col = ["#c9a77c", "#c4a176", "#cfae85", "#bf9d73", "#c9a77c", "#d2b48c", "#c2a078", "#cbab80"][n - 1];
+    svg += '<rect x="' + (BX - 8) + '" y="' + (BY - 8) + '" width="' + (HB + 16) + '" height="' + (HB + 16) + '" rx="6" fill="' + C.deep + '" opacity=".6"/>';
+    for (let n = 1; n < N * N; n++) {
+      const R = rng(700 + n * 31), col = ["#c9a77c", "#c4a176", "#cfae85", "#bf9d73", "#c9a77c", "#d2b48c", "#c2a078", "#cbab80"][(n - 1) % 8];
       const j = () => ((R() - 0.5) * 5).toFixed(1);
       svg += '<g class="p2t" data-i="' + n + '" style="transition:transform .22s ease"><g filter="url(#mano)" transform="rotate(' + ((R() - 0.5) * 3.6).toFixed(1) + " " + T / 2 + " " + T / 2 + ')">' +
         '<path d="M' + j() + " " + j() + " L" + (T + +j()) + " " + j() + " L" + (T + +j()) + " " + (T + +j()) + " L" + j() + " " + (T + +j()) + ' Z" fill="' + col + '" stroke="' + C.kraftDk + '" stroke-width="2"/>' +
@@ -2493,14 +2508,15 @@ const Paso2 = {
         '<text x="' + (T / 2 + (R() * 8 - 4)).toFixed(1) + '" y="' + (T - 14 + (R() * 4 - 2)).toFixed(1) + '" text-anchor="middle" font-size="' + (21 + ((R() * 4) | 0)) + '" font-style="italic" transform="rotate(' + ((R() - 0.5) * 12).toFixed(1) + " " + T / 2 + " " + (T - 16) + ')" fill="' + C.night + '" style="filter:url(#tinta)">' + n + "</text></g></g>";
     }
     // Esquema de referencia
-    svg += '<text x="180" y="508" text-anchor="middle" font-size="9" letter-spacing="4" fill="' + C.cream2 + '">ASÍ DEBE QUEDAR</text>';
-    for (let p = 0; p < 9; p++) {
-      const rx = 138 + (p % 3) * 30, ry = 522 + ((p / 3) | 0) * 30;
-      svg += '<rect x="' + rx + '" y="' + ry + '" width="26" height="26" rx="2" fill="' + (META[p] ? C.kraft : "none") + '" stroke="' + C.kraftDk + '" stroke-width="1"/>' +
-        (META[p] ? '<text x="' + (rx + 13) + '" y="' + (ry + 18) + '" text-anchor="middle" font-size="13" fill="' + C.night + '">' + META[p] + "</text>" : "");
+    const CS = D ? 20 : 26, ST = CS + 4;
+    svg += '<text x="180" y="' + (D ? 486 : 508) + '" text-anchor="middle" font-size="9" letter-spacing="4" fill="' + C.cream2 + '">ASÍ DEBE QUEDAR</text>';
+    for (let p = 0; p < N * N; p++) {
+      const rx = 180 - (N * ST) / 2 + (p % N) * ST, ry = (D ? 498 : 522) + ((p / N) | 0) * ST;
+      svg += '<rect x="' + rx + '" y="' + ry + '" width="' + CS + '" height="' + CS + '" rx="2" fill="' + (META[p] ? C.kraft : "none") + '" stroke="' + C.kraftDk + '" stroke-width="1"/>' +
+        (META[p] ? '<text x="' + (rx + CS / 2) + '" y="' + (ry + CS * 0.7) + '" text-anchor="middle" font-size="' + (CS / 2) + '" fill="' + C.night + '">' + META[p] + "</text>" : "");
     }
-    svg += '<g id="p2ok" style="opacity:0;transition:opacity .5s" pointer-events="none"><rect x="' + BX + '" y="' + (BY + 112) + '" width="292" height="68" fill="' + C.deep + '" opacity=".85"/>' +
-      '<text x="180" y="' + (BY + 154) + '" text-anchor="middle" font-size="20" letter-spacing="6" fill="' + C.pink + '">ABIERTO</text></g>';
+    svg += '<g id="p2ok" style="opacity:0;transition:opacity .5s" pointer-events="none"><rect x="' + BX + '" y="' + (BY + HB / 2 - 34) + '" width="' + HB + '" height="68" fill="' + C.deep + '" opacity=".85"/>' +
+      '<text x="180" y="' + (BY + HB / 2 + 8) + '" text-anchor="middle" font-size="20" letter-spacing="6" fill="' + C.pink + '">ABIERTO</text></g>';
 
     const wrap = makeSVG(svg);
     const el = wrap.querySelector("svg");
@@ -2518,7 +2534,7 @@ const Paso2 = {
       const n = tocado(e);
       if (n < 1) return;
       const p = b.indexOf(n), v = b.indexOf(0);
-      const dx = Math.abs((p % 3) - (v % 3)), dy = Math.abs(((p / 3) | 0) - ((v / 3) | 0));
+      const dx = Math.abs((p % N) - (v % N)), dy = Math.abs(((p / N) | 0) - ((v / N) | 0));
       if (dx + dy !== 1) { Sonido.play("tick"); return; }
       b[v] = n; b[p] = 0; Sonido.play("papel"); pinta();
       if (b.every((x, i) => x === META[i])) {
@@ -2528,7 +2544,7 @@ const Paso2 = {
       }
     });
     pinta();
-    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Los sobres se mezclaron en el buzón.", 4200); }, destruir() {} };
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say(D ? "Quince sobres, un solo hueco. Cada movimiento cuenta." : "Los sobres se mezclaron en el buzón.", 4200); }, destruir() {} };
   }
 };
 
@@ -2539,11 +2555,13 @@ const Paso3 = {
   pistas: [
     "Dos cartas iguales forman un par. Si no coinciden, se vuelven a esconder.",
     "Fijate en el lugar de cada símbolo antes de que se tapen. Empezá por las esquinas.",
-    "Hay seis símbolos: luna, estrella, corazón, llave, sobre y bolsa. Cada uno aparece dos veces."
+    "Cada símbolo aparece exactamente dos veces. Cuando veas uno por primera vez, fijate bien dónde está."
   ],
   construir() {
-    const NOMBRES = ["luna", "estrella", "corazon", "llave", "sobre", "bolsa"];
-    const CW = 92, CH = 112, GAP = 8, BX = 34, BY = 112;
+    const D = false;
+    const NOMBRES = ["luna", "estrella", "corazon", "llave", "sobre", "bolsa"].concat(D ? ["taza", "pluma", "reloj", "candado"] : []);
+    const COLS = D ? 4 : 3, CW = D ? 70 : 92, CH = D ? 88 : 112, GAP = 8, BY = D ? 102 : 112;
+    const BX = (360 - (COLS * CW + (COLS - 1) * GAP)) / 2;
     const mazo = NOMBRES.concat(NOMBRES).sort(() => Math.random() - 0.5);
 
     function dibujo(n) {
@@ -2551,12 +2569,17 @@ const Paso3 = {
         return '<rect x="-17" y="-11" width="34" height="22" fill="none" stroke="' + C.pinkDk + '" stroke-width="3"/><path d="M-17 -11 L0 3 L17 -11" fill="none" stroke="' + C.pinkDk + '" stroke-width="3"/>';
       if (n === "bolsa")
         return '<path d="M-14 -8 H14 L17 14 H-17 Z" fill="none" stroke="' + C.pinkDk + '" stroke-width="3" stroke-linejoin="round"/><path d="M-7 -8 V-14 H7 V-8" fill="none" stroke="' + C.pinkDk + '" stroke-width="3"/>';
+      const tr = ' fill="none" stroke="' + C.pinkDk + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"';
+      if (n === "taza") return '<path d="M-14 -10 H12 V8 Q12 16 4 16 H-6 Q-14 16 -14 8 Z"' + tr + '/><path d="M12 -5 H18 Q22 -5 22 1 Q22 7 12 7"' + tr + '/>';
+      if (n === "pluma") return '<path d="M-14 16 L14 -16 Q4 -4 6 6 Q-4 8 -14 16 Z"' + tr + '/><path d="M-14 16 L2 0"' + tr + '/>';
+      if (n === "reloj") return '<circle r="15"' + tr + '/><path d="M0 -8 V0 L7 4"' + tr + '/>';
+      if (n === "candado") return '<rect x="-12" y="-3" width="24" height="19" rx="2"' + tr + '/><path d="M-7 -3 V-9 Q-7 -17 0 -17 Q7 -17 7 -9 V-3"' + tr + '/>';
       return simbolo(n, 0, 0, 1.7, C.pinkDk);
     }
     let svg = fondoCierre(101);
     svg += '<text x="180" y="96" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">ARCHIVO · ENCONTRAR LOS PARES</text>';
     mazo.forEach((n, i) => {
-      const x = BX + (i % 3) * (CW + GAP), y = BY + ((i / 3) | 0) * (CH + GAP);
+      const x = BX + (i % COLS) * (CW + GAP), y = BY + ((i / COLS) | 0) * (CH + GAP);
       const R = rng(900 + i * 17);
       svg += '<g transform="translate(' + (x + (R() * 4 - 2)).toFixed(1) + " " + (y + (R() * 4 - 2)).toFixed(1) + ") rotate(" + ((R() - 0.5) * 3.4).toFixed(1) + " " + CW / 2 + " " + CH / 2 + ')"><g class="p3c" data-i="' + i + '" style="transform-box:fill-box;transform-origin:center;transition:transform .14s linear">' +
         '<g class="p3b"><rect width="' + CW + '" height="' + CH + '" rx="5" fill="' + C.pinkDk + '" stroke="' + C.pinkPl + '" stroke-width="2"/>' +
@@ -2564,7 +2587,7 @@ const Paso3 = {
         '<circle cx="' + (CW / 2 + (R() * 6 - 3)).toFixed(1) + '" cy="' + (CH / 2 + (R() * 6 - 3)).toFixed(1) + '" r="' + (7 + R() * 3).toFixed(1) + '" fill="' + C.pinkPl + '" opacity=".8"/>' +
         mancha(10 + R() * 70, 14 + R() * 84, 8, C.wood, 0.16, 300 + i) + '</g>' +
         '<g class="p3f" style="display:none"><rect width="' + CW + '" height="' + CH + '" rx="5" fill="' + C.cream + '" stroke="' + C.cream2 + '" stroke-width="2"/>' +
-        '<g transform="translate(' + CW / 2 + " " + CH / 2 + ') rotate(' + ((R() - 0.5) * 14).toFixed(1) + ')">' + dibujo(n) + "</g>" + mancha(70, 94, 9, C.kraftDk, 0.22, 400 + i) + "</g></g></g>";
+        '<g transform="translate(' + CW / 2 + " " + CH / 2 + ') rotate(' + ((R() - 0.5) * 14).toFixed(1) + ') scale(' + (D ? 0.8 : 1) + ')">' + dibujo(n) + "</g>" + mancha(70, 94, 9, C.kraftDk, 0.22, 400 + i) + "</g></g></g>";
     });
     const wrap = makeSVG(svg);
     const el = wrap.querySelector("svg");
@@ -2597,10 +2620,10 @@ const Paso3 = {
           if (parejas === NOMBRES.length) { Sonido.play("sello"); setTimeout(() => vivo && resolver(), 900); }
         }, 450);
       } else {
-        setTimeout(() => { if (!vivo) return; girar(a, false); girar(b, false); setTimeout(() => (bloqueo = false), 330); }, 850);
+        setTimeout(() => { if (!vivo) return; girar(a, false); girar(b, false); setTimeout(() => (bloqueo = false), 330); }, D ? 620 : 850);
       }
     });
-    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Seis pares, todos mezclados en el archivo.", 4200); }, destruir() { vivo = false; } };
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say(D ? "Diez pares, veinte cartas. Hay que mirar con atención." : "Seis pares, todos mezclados en el archivo.", 4200); }, destruir() { vivo = false; } };
   }
 };
 
@@ -2609,15 +2632,16 @@ const Paso3 = {
 // ===================================================================
 const Paso4 = {
   pistas: [
-    "La radio toca una melodía de cuatro notas de colores. Escuchala y repetila tocando los botones.",
+    "La radio toca una melodía de notas de colores. Escuchala y repetila tocando los botones. Cada ronda suma una nota.",
     "Si te equivocás, la melodía se repite igual desde el principio. No cambia.",
     "Podés tocar REPETIR para volver a escuchar. Acordate del orden de los colores, no de los sonidos."
   ],
   construir() {
     const COL = [C.amber, C.cream, C.blue, C.pink];
     const TON = [330, 392, 494, 587];
-    const RONDAS = [3, 4, 5, 6];
-    const secuencia = Array.from({ length: 6 }, () => (Math.random() * 4) | 0);
+    const D = false;
+    const RONDAS = D ? [4, 5, 6, 7, 8, 9] : [3, 4, 5, 6];
+    const secuencia = Array.from({ length: 9 }, () => (Math.random() * 4) | 0);
     const PX = [46, 184], PY = [236, 372], PS = 130;
 
     let svg = '<rect x="-80" y="-20" width="520" height="780" fill="' + C.night + '"/>';
@@ -2627,7 +2651,7 @@ const Paso4 = {
       '<text x="180" y="124" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">REPETIR LA MELODÍA</text>' +
       '<rect x="60" y="140" width="240" height="44" rx="6" fill="' + C.deep + '"/>' +
       '<text id="p4txt" x="180" y="168" text-anchor="middle" font-size="14" letter-spacing="5" fill="' + C.pink + '">ESCUCHÁ</text>';
-    for (let r = 0; r < 4; r++) svg += '<circle class="p4d" cx="' + (150 + r * 20) + '" cy="208" r="5" fill="' + C.night3 + '"/>';
+    for (let r = 0; r < RONDAS.length; r++) svg += '<circle class="p4d" cx="' + (180 - (RONDAS.length - 1) * 10 + r * 20) + '" cy="208" r="5" fill="' + C.night3 + '"/>';
     for (let k = 0; k < 4; k++) {
       const x = PX[k % 2], y = PY[(k / 2) | 0];
       svg += '<g class="p4p" data-i="' + k + '" style="transition:opacity .08s"><rect x="' + x + '" y="' + y + '" width="' + PS + '" height="' + PS + '" rx="12" fill="' + COL[k] + '" opacity=".38" class="p4r" stroke="' + COL[k] + '" stroke-width="2"/></g>';
@@ -2648,7 +2672,7 @@ const Paso4 = {
     function luz(k, on) { rects[k].setAttribute("opacity", on ? 1 : 0.38); }
     async function sonar(k, ms) {
       luz(k, true); Sonido.nota(TON[k]);
-      await sleep(ms || 380); luz(k, false); await sleep(160);
+      await sleep(ms || (D ? 300 : 380)); luz(k, false); await sleep(D ? 110 : 160);
     }
     async function reproducir() {
       const mi = ++tokenReprod; turno = false; indice = 0; estado("ESCUCHÁ");
@@ -2684,6 +2708,833 @@ const Paso4 = {
 };
 
 const PASOS2 = [Paso1, Paso2, Paso3, Paso4];
+
+</script>
+<script>
+/*
+ ////////////////////////////////////////////////////////////////////
+ ///////////  TERCEROS DESAFÍOS (SOLO MODO DIFÍCIL, PASO 3)  ////////
+ ////////////////////////////////////////////////////////////////////
+ Una prueba extra por sala. En la versión normal este archivo se carga
+ igual, pero EXTRAS nunca se usa (main.js solo lo lee si CONFIG.DIFICIL).
+   Extra1 · Lámparas      (sala 1)  apagar un tablero 5x5
+   Extra2 · Sellos        (sala 2)  adivinar el orden secreto (mastermind)
+   Extra3 · Torre         (sala 3)  torre de Hanoi de 5 sellos
+   Extra4 · Tormenta      (sala 4)  atrapar sobres con sello rosa
+ Todos exponen { pistas[3], construir() → { el, resuelto, alEntrar, destruir } }
+*/
+
+// ===================================================================
+// CABECERA COMÚN
+// ===================================================================
+function cabeceraExtra(titulo, sub) {
+  return '<text x="180" y="86" text-anchor="middle" font-size="10" letter-spacing="5" fill="' + C.cream2 + '">' + titulo + "</text>" +
+    '<text id="exsub" x="180" y="108" text-anchor="middle" font-size="12" letter-spacing="3" fill="' + C.pink + '">' + sub + "</text>";
+}
+
+// ===================================================================
+// EXTRA 1 · LÁMPARAS (sala 1) · lights out 5x5
+// ===================================================================
+const Extra1 = {
+  pistas: [
+    "Cada lámpara que tocás se cambia a sí misma y a sus cuatro vecinas (arriba, abajo, izquierda y derecha). Hay que dejarlas todas apagadas.",
+    "El orden en que tocás no importa, y tocar dos veces la misma lámpara no cambia nada.",
+    "Cada toque dibuja una cruz de cinco lámparas (la tocada y sus cuatro vecinas). El tablero apagado se desordenó con unos pocos toques, así que hay que deshacerlos: busca dónde habría un centro de cruz.",
+    "Tocá una lámpara prendida que tenga prendidas varias vecinas: eso suele ser un centro de cruz. Si el tablero queda peor, tocala otra vez para deshacerlo o usá REINICIAR.",
+    "Método seguro: recorré las filas de arriba hacia abajo. Si una lámpara está prendida, tocá la que está justo debajo de ella (así la apagás sin tocar nada de arriba). Al llegar a la última fila, REINICIAR y probá empezar tocando otra lámpara de la fila de arriba."
+  ],
+  construir() {
+    const N = 5, S = 50, G = 6, BX = (360 - (N * S + (N - 1) * G)) / 2, BY = 190;
+    const pulsa = (a, i) => {
+      const x = i % N, y = (i / N) | 0;
+      [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+        const X = x + dx, Y = y + dy;
+        if (X >= 0 && X < N && Y >= 0 && Y < N) a[Y * N + X] ^= 1;
+      });
+    };
+    function mezcla() {
+      let a;
+      do {
+        a = new Array(N * N).fill(0);
+        const n = 4 + ((Math.random() * 3) | 0);
+        for (let k = 0; k < n; k++) pulsa(a, (Math.random() * N * N) | 0);
+      } while (a.reduce((s, v) => s + v, 0) < 6);
+      return a;
+    }
+    let inicio = mezcla(), b = inicio.slice(), movs = 0, hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+
+    let svg = fondoCierre(901) + cabeceraExtra("TABLERO DE LÁMPARAS", "APAGALAS TODAS");
+    svg += '<rect x="' + (BX - 10) + '" y="' + (BY - 10) + '" width="' + (N * S + (N - 1) * G + 20) + '" height="' + (N * S + (N - 1) * G + 20) + '" rx="6" fill="' + C.night + '" stroke="#2a2030" stroke-width="2"/>';
+    for (let i = 0; i < N * N; i++) {
+      svg += '<rect class="exl" data-i="' + i + '" x="' + (BX + (i % N) * (S + G)) + '" y="' + (BY + ((i / N) | 0) * (S + G)) + '" width="' + S + '" height="' + S + '" rx="4" fill="' + C.night3 + '" stroke="#2a2030" stroke-width="1.5"/>';
+    }
+    svg += '<text id="exmov" x="180" y="548" text-anchor="middle" font-size="12" letter-spacing="3" fill="' + C.cream2 + '">MOVIMIENTOS 0</text>' +
+      '<g data-i="99"><rect x="120" y="580" width="120" height="38" rx="6" fill="none" stroke="' + C.cream2 + '" stroke-width="1.5"/>' +
+      '<text x="180" y="604" text-anchor="middle" font-size="12" letter-spacing="4" fill="' + C.cream2 + '">REINICIAR</text></g>' +
+      '<g data-i="98"><rect x="250" y="580" width="90" height="38" rx="6" fill="none" stroke="' + C.pink + '" stroke-width="1.5"/>' +
+      '<text x="295" y="604" text-anchor="middle" font-size="11" letter-spacing="3" fill="' + C.pink + '">SOLUCIÓN</text></g><g id="exsol" pointer-events="none"></g>';
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const celdas = [...el.querySelectorAll(".exl")];
+    const mov = el.querySelector("#exmov");
+    // Solución: prueba las 32 combinaciones de la fila de arriba y persigue las luces
+    function solucion() {
+      let mejor = null;
+      for (let m = 0; m < 32; m++) {
+        const a = b.slice(), pr = [];
+        for (let x = 0; x < N; x++) if (m >> x & 1) { pulsa(a, x); pr.push(x); }
+        for (let y = 1; y < N; y++) for (let x = 0; x < N; x++) if (a[(y - 1) * N + x]) { pulsa(a, y * N + x); pr.push(y * N + x); }
+        if (a.every((v) => !v) && (!mejor || pr.length < mejor.length)) mejor = pr;
+      }
+      return mejor || [];
+    }
+    function muestraSolucion() {
+      let t = "";
+      solucion().forEach((i, k) => {
+        const x = BX + (i % N) * (S + G) + S / 2, y = BY + ((i / N) | 0) * (S + G) + S / 2;
+        t += '<circle cx="' + x + '" cy="' + y + '" r="14" fill="' + C.deep + '" stroke="' + C.cream + '" stroke-width="2"/><text x="' + x + '" y="' + (y + 5) + '" text-anchor="middle" font-size="14" fill="' + C.cream + '">' + (k + 1) + "</text>";
+      });
+      el.querySelector("#exsol").innerHTML = t;
+    }
+    function pinta() {
+      el.querySelector("#exsol").innerHTML = "";
+      celdas.forEach((c, i) => c.setAttribute("fill", b[i] ? C.pink : C.night3));
+      mov.textContent = "MOVIMIENTOS " + movs;
+      wrap.dataset.luces = b.join("");
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      if (i === 98) { muestraSolucion(); Sonido.play("hint"); return; }
+      if (i === 99) { b = inicio.slice(); movs = 0; Sonido.play("papel"); pinta(); return; }
+      pulsa(b, i); movs++; Sonido.play("tick"); pinta();
+      if (b.every((v) => !v)) {
+        hecho = true; Sonido.play("sello");
+        el.querySelector("#exsub").textContent = "TODO APAGADO";
+        setTimeout(() => vivo && resolver(), 1300);
+      }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Las lámparas de la oficina están todas prendidas.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 2 · SELLOS (sala 2) · orden secreto de cuatro sellos
+// ===================================================================
+const Extra2 = {
+  pistas: [
+    "Hay un orden secreto de cuatro sellos de colores. Ningún color se repite. Armá una combinación y tocá ENVIAR.",
+    "Círculo lleno: un sello es correcto y está en su lugar. Círculo vacío: el sello existe en el orden, pero en otro lugar.",
+    "Probá dos colores nuevos en cada intento y fijate cuántos círculos suma cada cambio. Si un intento no suma ningún círculo, esos colores no están."
+  ],
+  construir() {
+    const COL = [C.pink, C.amber, C.blue, C.cream, "#7aa77c", "#8e6aa8"];
+    const MAXI = 10;
+    function secretoNuevo() {
+      const a = [0, 1, 2, 3, 4, 5];
+      for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; }
+      return a.slice(0, 4);
+    }
+    let secreto = secretoNuevo(), hist = [], cur = [], hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+
+    let svg = fondoCierre(902) + cabeceraExtra("EL ORDEN DE LOS SELLOS", "ADIVINÁ LA COMBINACIÓN");
+    svg += '<rect x="22" y="118" width="316" height="388" rx="8" fill="' + C.night + '" stroke="#2a2030" stroke-width="2"/><g id="exmm"></g>';
+    svg += '<text x="180" y="524" text-anchor="middle" font-size="9" letter-spacing="2" fill="' + C.cream2 + '">LLENO: LUGAR Y COLOR   ·   VACÍO: SOLO COLOR</text>';
+    for (let k = 0; k < 6; k++) {
+      svg += '<circle data-i="' + k + '" cx="' + (60 + k * 48) + '" cy="556" r="18" fill="' + COL[k] + '" stroke="#2a2030" stroke-width="2"/>';
+    }
+    svg += '<g data-i="10"><rect x="60" y="586" width="110" height="38" rx="6" fill="' + C.deep + '" stroke="' + C.pink + '" stroke-width="1.5"/>' +
+      '<text x="115" y="610" text-anchor="middle" font-size="12" letter-spacing="4" fill="' + C.pink + '">ENVIAR</text></g>' +
+      '<g data-i="11"><rect x="190" y="586" width="110" height="38" rx="6" fill="none" stroke="' + C.cream2 + '" stroke-width="1.5"/>' +
+      '<text x="245" y="610" text-anchor="middle" font-size="12" letter-spacing="4" fill="' + C.cream2 + '">BORRAR</text></g>';
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const mm = el.querySelector("#exmm");
+    wrap.dataset.secreto = secreto.join(",");
+
+    function fila(r, g, fb) {
+      const y = 128 + r * 36;
+      let s = "";
+      for (let k = 0; k < 4; k++) {
+        const v = g[k];
+        s += '<circle cx="' + (52 + k * 44) + '" cy="' + (y + 16) + '" r="15" fill="' + (v === undefined ? "none" : COL[v]) + '" stroke="' + (v === undefined ? C.night3 : "#2a2030") + '" stroke-width="2"/>';
+      }
+      if (fb) {
+        for (let k = 0; k < 4; k++) {
+          const cx = 250 + (k % 2) * 18, cy = y + 8 + ((k / 2) | 0) * 16;
+          if (k < fb.n) s += '<circle cx="' + cx + '" cy="' + cy + '" r="6" fill="' + C.cream + '"/>';
+          else if (k < fb.n + fb.b) s += '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="none" stroke="' + C.cream + '" stroke-width="1.8"/>';
+          else s += '<circle cx="' + cx + '" cy="' + cy + '" r="2" fill="' + C.night3 + '"/>';
+        }
+      }
+      return s;
+    }
+    function pinta() {
+      let s = "";
+      hist.forEach((h, r) => (s += fila(r, h.g, h)));
+      if (!hecho && hist.length < MAXI) s += fila(hist.length, cur, null);
+      mm.innerHTML = s;
+      wrap.dataset.intentos = hist.length;
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      if (i < 6) {
+        if (cur.length >= 4 || cur.includes(i)) { if (cur.includes(i)) Sonido.play("error"); return; }
+        cur.push(i); Sonido.play("tap"); pinta(); return;
+      }
+      if (i === 11) { cur.pop(); Sonido.play("papel"); pinta(); return; }
+      if (i === 10) {
+        if (cur.length < 4) { Sonido.play("error"); return; }
+        let n = 0;
+        cur.forEach((v, k) => { if (v === secreto[k]) n++; });
+        const b = cur.filter((v) => secreto.includes(v)).length - n;
+        hist.push({ g: cur.slice(), n, b }); cur = [];
+        if (n === 4) {
+          hecho = true; Sonido.play("sello");
+          el.querySelector("#exsub").textContent = "COMBINACIÓN CORRECTA";
+          pinta(); setTimeout(() => vivo && resolver(), 1300); return;
+        }
+        Sonido.play("sube");
+        if (hist.length >= MAXI) {
+          // Se acabaron los intentos: nuevo orden secreto
+          UI.say("Se acabaron los intentos. El orden cambió.", 3800);
+          secreto = secretoNuevo(); wrap.dataset.secreto = secreto.join(","); hist = [];
+        }
+        pinta();
+      }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("El sello de la oficina se guarda en un orden fijo. Hay que dar con él.", 4400); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 3 · TORRE (sala 3) · torre de Hanoi con 5 sellos
+// ===================================================================
+const Extra3 = {
+  pistas: [
+    "Hay que mover los cinco sellos de la primera varilla a la última. Tocá una varilla para elegirla y otra para soltar el sello de arriba.",
+    "Solo se mueve un sello por vez, y nunca podés poner uno grande sobre uno más chico.",
+    "El truco: alterná. Un movimiento con el sello más chico y otro con el único otro movimiento posible. El chico va siempre en el mismo ciclo: varilla 1, 3, 2, 1, 3, 2... Son 31 movimientos como mínimo."
+  ],
+  construir() {
+    const NP = 5, PX = [70, 180, 290], BASEY = 560, H = 26;
+    const COL = [C.pink, C.amber, C.blue, C.cream, "#7aa77c"];
+    let torres = [[5, 4, 3, 2, 1], [], []], sel = -1, movs = 0, hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+
+    let svg = fondoCierre(903) + cabeceraExtra("LA TORRE DE SELLOS", "TODOS A LA ÚLTIMA VARILLA");
+    svg += '<rect x="30" y="' + BASEY + '" width="300" height="12" rx="3" fill="' + C.wood3 + '" stroke="#2a2030" stroke-width="2"/>';
+    for (let p = 0; p < 3; p++) svg += '<rect x="' + (PX[p] - 4) + '" y="' + (BASEY - 210) + '" width="8" height="210" fill="' + C.wood3 + '" stroke="#2a2030" stroke-width="1.5"/>';
+    svg += '<g id="exdisc"></g>';
+    for (let p = 0; p < 3; p++) svg += '<rect data-i="' + p + '" x="' + (PX[p] - 55) + '" y="' + (BASEY - 240) + '" width="110" height="260" fill="#000" opacity="0"/>';
+    svg += '<text id="exmov" x="180" y="618" text-anchor="middle" font-size="12" letter-spacing="3" fill="' + C.cream2 + '">MOVIMIENTOS 0</text>';
+
+    const wrap = makeSVG(svg);
+    const el = wrap.querySelector("svg");
+    const gd = el.querySelector("#exdisc");
+    function pinta() {
+      let s = "";
+      torres.forEach((t, p) => t.forEach((n, k) => {
+        const w = 30 + n * 13, y = BASEY - (k + 1) * H;
+        const alto = sel === p && k === t.length - 1;
+        s += '<rect x="' + (PX[p] - w / 2) + '" y="' + (y - (alto ? 14 : 0)) + '" width="' + w + '" height="' + (H - 3) + '" rx="5" fill="' + COL[n - 1] + '" stroke="' + (alto ? C.cream : "#2a2030") + '" stroke-width="' + (alto ? 3 : 2) + '"/>';
+      }));
+      gd.innerHTML = s;
+      el.querySelector("#exmov").textContent = "MOVIMIENTOS " + movs;
+      wrap.dataset.torres = torres.map((t) => t.join("")).join("|");
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const p = tocado(e);
+      if (p < 0) return;
+      if (sel < 0) {
+        if (!torres[p].length) { Sonido.play("error"); return; }
+        sel = p; Sonido.play("tap"); pinta(); return;
+      }
+      if (sel === p) { sel = -1; pinta(); return; }
+      const n = torres[sel][torres[sel].length - 1], tope = torres[p][torres[p].length - 1];
+      if (tope !== undefined && tope < n) { Sonido.play("error"); sel = -1; pinta(); return; }
+      torres[sel].pop(); torres[p].push(n); sel = -1; movs++; Sonido.play("papel"); pinta();
+      if (torres[2].length === NP) {
+        hecho = true; Sonido.play("sello");
+        el.querySelector("#exsub").textContent = "TORRE TRASLADADA";
+        setTimeout(() => vivo && resolver(), 1300);
+      }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Cinco sellos apilados en el lugar equivocado.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 4 · TORMENTA DE CARTAS (sala 4) · atrapar los sobres con sello rosa
+// ===================================================================
+const Extra4 = {
+  pistas: [
+    "Entró una ráfaga y las cartas caen por toda la oficina. Tocá solo los sobres con el sello rosa (el del corazón) antes de que lleguen abajo.",
+    "Los sobres con sello azul no son para vos: si los tocás perdés un punto. Los que no tocás se pierden y no pasa nada, así que no hace falta apurarse.",
+    "Fijate en el sello antes de tocar. Mirá solo el color del círculo del sobre. Hay que juntar 15 puntos."
+  ],
+  construir() {
+    const META = 15, COLX = [58, 136, 224, 302], TOPY = 128, BOTY = 640;
+    let puntos = 0, tiempo = 0, nextId = 0, sobres = [], ultimaSpawn = 0, raf = 0, ultimo = 0, hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+    let svg = fondoCierre(904) + cabeceraExtra("TORMENTA DE CARTAS", "TOCÁ LOS SOBRES CON SELLO ROSA") +
+      '<text id="expts" x="180" y="136" text-anchor="middle" font-size="12" letter-spacing="4" fill="' + C.cream + '">0 DE ' + META + '</text>' +
+      '<rect x="22" y="146" width="316" height="2" fill="' + C.night3 + '"/><g id="exf"></g>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg"), gf = el.querySelector("#exf"), pts = el.querySelector("#expts");
+    wrap.dataset.puntos = 0;
+    function crea() {
+      const bueno = Math.random() < 0.55, col = (Math.random() * 4) | 0;
+      const x = COLX[col] + (Math.random() * 18 - 9), id = nextId++;
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.setAttribute("data-id", id); g.setAttribute("data-bueno", bueno ? 1 : 0);
+      g.innerHTML = '<rect x="-34" y="-28" width="68" height="56" fill="#000" opacity="0"/>' +
+        '<rect x="-24" y="-16" width="48" height="32" rx="2" fill="' + C.kraft + '" stroke="#2a2030" stroke-width="2"/>' +
+        '<path d="M-24 -16 L0 4 L24 -16" fill="none" stroke="' + C.kraftDk + '" stroke-width="2"/>' +
+        '<circle cx="0" cy="4" r="8" fill="' + (bueno ? C.pink : C.blue) + '" stroke="#2a2030" stroke-width="1.5"/>' +
+        (bueno ? '<g transform="translate(0 4) scale(.2)">' + simbolo("corazon", 0, 0, 1.7, C.night) + "</g>" : "");
+      gf.appendChild(g);
+      sobres.push({ id, g, x, y: TOPY, v: 80 + Math.random() * 30 + Math.min(70, tiempo * 3), rot: Math.random() * 30 - 15, bueno });
+    }
+    function bucle(t) {
+      if (!vivo || hecho) return;
+      const dt = Math.min(0.05, (t - (ultimo || t)) / 1000); ultimo = t; tiempo += dt;
+      if (t - ultimaSpawn > Math.max(480, 800 - tiempo * 8)) { ultimaSpawn = t; crea(); }
+      sobres = sobres.filter((o) => {
+        o.y += o.v * dt;
+        if (o.y > BOTY) { o.g.remove(); return false; }
+        o.g.setAttribute("transform", "translate(" + o.x.toFixed(1) + " " + o.y.toFixed(1) + ") rotate(" + o.rot.toFixed(0) + ")");
+        return true;
+      });
+      raf = requestAnimationFrame(bucle);
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const g = e.target.closest ? e.target.closest("[data-id]") : null;
+      if (!g) return;
+      const idx = sobres.findIndex((o) => o.id === +g.getAttribute("data-id"));
+      if (idx < 0) return;
+      const o = sobres[idx]; sobres.splice(idx, 1); o.g.remove();
+      if (o.bueno) { puntos++; Sonido.play("par"); }
+      else { puntos = Math.max(0, puntos - 1); Sonido.play("error"); }
+      pts.textContent = puntos + " DE " + META; wrap.dataset.puntos = puntos;
+      if (puntos >= META) {
+        hecho = true; Sonido.play("sello"); gf.innerHTML = "";
+        el.querySelector("#exsub").textContent = "TODAS RECOGIDAS";
+        setTimeout(() => vivo && resolver(), 1300);
+      }
+    });
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Una ráfaga de viento dejó las cartas por el aire.", 4200); raf = requestAnimationFrame(bucle); }, destruir() { vivo = false; cancelAnimationFrame(raf); } };
+  }
+};
+
+// ===================================================================
+// EXTRA 5 · CAJÓN CON COMBINACIÓN (sala 1) · deducir tres cifras
+// ===================================================================
+const Extra5 = {
+  pistas: [
+    "Hay que encontrar tres números (uno por columna). Las frases de abajo te dan datos: leelas todas y probá combinaciones con las flechas.",
+    "Empezá por la última frase: el tercer número es el doble del segundo más 2. Eso deja muy pocas opciones: si el segundo es 0 el tercero es 2, si es 1 es 4, y así.",
+    "Los tres suman 15 y son distintos. El segundo es par. Probá el segundo en 2: el tercero es 6, y el primero tiene que ser 15 menos 8."
+  ],
+  construir() {
+    const CODIGO = [7, 2, 6];
+    let v = [0, 0, 0], hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+    let svg = fondoCierre(905) + cabeceraExtra("EL CAJÓN CON COMBINACIÓN", "TRES NÚMEROS, CUATRO DATOS");
+    for (let k = 0; k < 3; k++) {
+      const x = 70 + k * 110;
+      svg += '<g data-i="' + k + '"><path d="M' + (x - 26) + " 270 L" + x + " 244 L" + (x + 26) + ' 270 Z" fill="' + C.cream2 + '"/><rect x="' + (x - 38) + '" y="236" width="76" height="40" fill="#000" opacity="0"/></g>' +
+        '<rect x="' + (x - 36) + '" y="282" width="72" height="84" rx="6" fill="' + C.night + '" stroke="#2a2030" stroke-width="2"/>' +
+        '<text class="exd" x="' + x + '" y="342" text-anchor="middle" font-size="48" fill="' + C.pink + '">0</text>' +
+        '<g data-i="' + (3 + k) + '"><path d="M' + (x - 26) + " 378 L" + x + " 404 L" + (x + 26) + ' 378 Z" fill="' + C.cream2 + '"/><rect x="' + (x - 38) + '" y="372" width="76" height="40" fill="#000" opacity="0"/></g>';
+    }
+    const D = ["Los tres números son distintos.", "Los tres suman 15.", "El segundo número es par.", "El tercero es el doble del segundo, más 2."];
+    D.forEach((t, i) => (svg += '<text x="180" y="' + (452 + i * 26) + '" text-anchor="middle" font-size="12" fill="' + C.cream + '">' + t + "</text>"));
+    svg += '<g data-i="9"><rect x="110" y="570" width="140" height="40" rx="6" fill="' + C.deep + '" stroke="' + C.pink + '" stroke-width="1.5"/><text x="180" y="595" text-anchor="middle" font-size="13" letter-spacing="5" fill="' + C.pink + '">ABRIR</text></g>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg"), ds = [...el.querySelectorAll(".exd")];
+    wrap.dataset.codigo = CODIGO.join("");
+    function pinta() { ds.forEach((t, k) => (t.textContent = v[k])); wrap.dataset.valor = v.join(""); }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      if (i < 3) { v[i] = (v[i] + 1) % 10; Sonido.play("tick"); pinta(); return; }
+      if (i < 6) { v[i - 3] = (v[i - 3] + 9) % 10; Sonido.play("tick"); pinta(); return; }
+      if (i === 9) {
+        if (v.join("") === CODIGO.join("")) { hecho = true; Sonido.play("sello"); el.querySelector("#exsub").textContent = "SE ABRIÓ"; setTimeout(() => vivo && resolver(), 1300); }
+        else Sonido.play("error");
+      }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Este cajón no abre con llave. Pide tres números.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 6 · EL CULPABLE (sala 2) · tres casos de deducción
+// ===================================================================
+const Extra6 = {
+  pistas: [
+    "Cinco empleados dicen una frase cada uno. La regla de arriba dice cuántas de esas frases son verdaderas. Solo uno perdió la carta. Tocá a quien creas culpable.",
+    "Probá suponer un culpable y revisá qué frases quedan verdaderas. Si el número no coincide con la regla, ese no es.",
+    "Tené cuidado con las frases sobre otros que mienten o dicen la verdad: dependen de si esa otra frase es verdadera o no. Evaluá primero las que hablan de quién fue."
+  ],
+  construir() {
+    const NOM = ["Aurelio", "Beatriz", "Casimiro", "Delia", "Eusebio"];
+    const CASOS = [
+      { k: 1, st: [["miente", 1], ["fue", 0], ["nofue", 4], ["fue", 2], ["fue", 0]], c: 4 },
+      { k: 1, st: [["miente", 2], ["miente", 2], ["nofue", 1], ["verdad", 1], ["nofue", 4]], c: 4 },
+      { k: 2, st: [["miente", 1], ["fue", 2], ["verdad", 3], ["nofue", 4], ["miente", 3]], c: 4 }
+    ];
+    let caso = 0, perm, hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+    function mezclar() { perm = [0, 1, 2, 3, 4]; for (let i = 4; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [perm[i], perm[j]] = [perm[j], perm[i]]; } }
+    mezclar();
+    let svg = fondoCierre(906) + cabeceraExtra("QUIÉN PERDIÓ LA CARTA", "CASO 1 DE 3") +
+      '<text id="exreg" x="180" y="146" text-anchor="middle" font-size="11" letter-spacing="1" fill="' + C.cream + '"></text><g id="exp"></g>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg"), gp = el.querySelector("#exp"), reg = el.querySelector("#exreg");
+    function frase(t, x) {
+      const n = NOM[perm[x]];
+      return t === "fue" ? "Fue " + n + "." : t === "nofue" ? n + " no fue." : t === "miente" ? n + " miente." : n + " dice la verdad.";
+    }
+    function pinta() {
+      const cs = CASOS[caso];
+      el.querySelector("#exsub").textContent = "CASO " + (caso + 1) + " DE 3";
+      reg.textContent = cs.k === 1 ? "EXACTAMENTE UNA FRASE ES VERDADERA" : "EXACTAMENTE " + cs.k + " FRASES SON VERDADERAS";
+      let s = "";
+      for (let e = 0; e < 5; e++) {
+        const y = 168 + e * 78, id = perm.indexOf(e); // empleado e: su frase es la del slot "id"
+        const [t, x] = cs.st[id];
+        s += '<g data-i="' + e + '"><rect x="26" y="' + y + '" width="308" height="66" rx="6" fill="' + C.night + '" stroke="#2a2030" stroke-width="2"/>' +
+          '<text x="42" y="' + (y + 26) + '" font-size="12" letter-spacing="2" fill="' + C.pink + '">' + NOM[e].toUpperCase() + "</text>" +
+          '<text x="42" y="' + (y + 50) + '" font-size="13" fill="' + C.cream + '">«' + frase(t, x) + "»</text></g>";
+      }
+      gp.innerHTML = s;
+      wrap.dataset.culpable = NOM[perm[cs.c]];
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      if (i === perm[CASOS[caso].c]) {
+        Sonido.play("par"); caso++;
+        if (caso >= CASOS.length) { hecho = true; Sonido.play("sello"); el.querySelector("#exsub").textContent = "CASO CERRADO"; setTimeout(() => vivo && resolver(), 1300); return; }
+        mezclar(); pinta();
+      } else { Sonido.play("error"); UI.penalizar && UI.penalizar(); }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Alguien perdió una carta y todos tienen algo que decir.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 7 · SUDOKU DE SELLOS (sala 3) · 4x4 con símbolos
+// ===================================================================
+const Extra7 = {
+  pistas: [
+    "Cada fila, cada columna y cada cuadrado de 2x2 tiene que llevar los cuatro símbolos, sin repetir. Tocá una casilla vacía y después un símbolo de abajo.",
+    "Buscá una casilla donde solo entre un símbolo: mirá lo que ya hay en su fila, su columna y su cuadrado.",
+    "Empezá por el cuadrado que tenga más símbolos ya puestos. Si te equivocás, tocá la casilla y después BORRAR."
+  ],
+  construir() {
+    const SIMB = ["luna", "estrella", "corazon", "llave"];
+    // Solución barajada
+    const base = [[0, 1, 2, 3], [2, 3, 0, 1], [1, 0, 3, 2], [3, 2, 1, 0]];
+    const mz = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const sy = mz([0, 1, 2, 3]), rf = [].concat(mz([0, 1])).concat(mz([2, 3])), cf = [].concat(mz([0, 1])).concat(mz([2, 3]));
+    const sol = []; for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) sol.push(sy[base[rf[r]][cf[c]]]);
+    function cuenta(g) { // soluciones (tope 2)
+      const i = g.indexOf(-1); if (i < 0) return 1;
+      let n = 0;
+      for (let v = 0; v < 4 && n < 2; v++) {
+        const r = (i / 4) | 0, c = i % 4; let bien = true;
+        for (let k = 0; k < 16; k++) {
+          if (g[k] !== v) continue;
+          const r2 = (k / 4) | 0, c2 = k % 4;
+          if (r2 === r || c2 === c || (((r2 / 2) | 0) === ((r / 2) | 0) && ((c2 / 2) | 0) === ((c / 2) | 0))) { bien = false; break; }
+        }
+        if (bien) { g[i] = v; n += cuenta(g); g[i] = -1; }
+      }
+      return n;
+    }
+    const dado = sol.slice(), orden = mz([...Array(16).keys()]);
+    for (const i of orden) { const v = dado[i]; dado[i] = -1; if (cuenta(dado.slice()) !== 1) dado[i] = v; else if (dado.filter((x) => x >= 0).length <= 5) break; }
+    const g = dado.slice(); let sel = -1, hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+    const X0 = 60, Y0 = 170, S = 60;
+    let svg = fondoCierre(907) + cabeceraExtra("SUDOKU DE SELLOS", "CUATRO SÍMBOLOS, SIN REPETIR") + '<rect x="' + (X0 - 8) + '" y="' + (Y0 - 8) + '" width="' + (4 * S + 16) + '" height="' + (4 * S + 16) + '" rx="6" fill="' + C.night + '" stroke="#2a2030" stroke-width="2"/>';
+    for (let i = 0; i < 16; i++) svg += '<rect class="exs" data-i="' + i + '" x="' + (X0 + (i % 4) * S) + '" y="' + (Y0 + ((i / 4) | 0) * S) + '" width="' + S + '" height="' + S + '" fill="' + C.night2 + '" stroke="' + C.night3 + '" stroke-width="1.5"/>';
+    svg += '<path d="M' + (X0 + 2 * S) + " " + Y0 + " v" + 4 * S + " M" + X0 + " " + (Y0 + 2 * S) + " h" + 4 * S + '" stroke="' + C.cream2 + '" stroke-width="3" pointer-events="none"/><g id="exg" pointer-events="none"></g>';
+    for (let k = 0; k < 4; k++) svg += '<g data-i="' + (20 + k) + '"><rect x="' + (46 + k * 70) + '" y="470" width="56" height="56" rx="6" fill="none" stroke="' + C.cream2 + '" stroke-width="1.5"/><g transform="translate(' + (74 + k * 70) + ',498) scale(.55)">' + simbolo(SIMB[k], 0, 0, 1.7, C.pink) + "</g></g>";
+    svg += '<g data-i="30"><rect x="120" y="556" width="120" height="38" rx="6" fill="none" stroke="' + C.cream2 + '" stroke-width="1.5"/><text x="180" y="580" text-anchor="middle" font-size="12" letter-spacing="4" fill="' + C.cream2 + '">BORRAR</text></g>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg"), gg = el.querySelector("#exg"), cel = [...el.querySelectorAll(".exs")];
+    wrap.dataset.sol = sol.join(",");
+    function bien() {
+      if (g.includes(-1)) return false;
+      for (let a = 0; a < 4; a++) {
+        const f = new Set(), c = new Set(), q = new Set();
+        for (let b = 0; b < 4; b++) { f.add(g[a * 4 + b]); c.add(g[b * 4 + a]); q.add(g[((a >> 1) * 2 + (b >> 1)) * 4 + (a % 2) * 2 + (b % 2)]); }
+        if (f.size < 4 || c.size < 4 || q.size < 4) return false;
+      }
+      return true;
+    }
+    function pinta() {
+      let s = "";
+      g.forEach((v, i) => { if (v >= 0) s += '<g transform="translate(' + (X0 + (i % 4) * S + S / 2) + "," + (Y0 + ((i / 4) | 0) * S + S / 2) + ') scale(.62)">' + simbolo(SIMB[v], 0, 0, 1.7, dado[i] >= 0 ? C.cream : C.pink) + "</g>"; });
+      gg.innerHTML = s;
+      cel.forEach((c, i) => c.setAttribute("fill", i === sel ? C.night3 : C.night2));
+      wrap.dataset.grilla = g.join(",");
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      if (i < 16) { if (dado[i] >= 0) return; sel = i; Sonido.play("tap"); pinta(); return; }
+      if (sel < 0) return;
+      if (i === 30) g[sel] = -1; else g[sel] = i - 20;
+      Sonido.play("papel"); pinta();
+      if (!g.includes(-1)) {
+        if (bien()) { hecho = true; Sonido.play("sello"); el.querySelector("#exsub").textContent = "TODO EN ORDEN"; setTimeout(() => vivo && resolver(), 1300); }
+        else { Sonido.play("error"); UI.say("Algo no cuadra. Hay un símbolo repetido.", 3200); }
+      }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Los sellos del archivo tienen que quedar bien repartidos.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 8 · TELÉGRAFO (sala 4) · mensaje en Morse, de a dos letras
+// ===================================================================
+const Extra8 = {
+  pistas: [
+    "La radio transmite un mensaje en Morse, de a dos letras por vez: puntos cortos y rayas largas. Arriba tenés la tabla con las letras posibles. Tocá las dos letras que suenan.",
+    "Una pausa corta separa los puntos y las rayas de una letra, y una pausa más larga separa una letra de la siguiente. Podés tocar REPETIR todas las veces que quieras.",
+    "Mirá la tabla: cada letra tiene su dibujo de puntos (·) y rayas (−). Contá cuántos puntos y rayas suenan en cada letra y buscá cuál coincide. Las letras que van apareciendo arman una frase para alguien especial."
+  ],
+  construir() {
+    const M = { A: ".-", C: "-.-.", D: "-..", E: ".", I: "..", L: ".-..", M: "--", O: "---", R: ".-.", T: "-" };
+    const FRASE = "TE AMO COCODRILO", SOLO = FRASE.replace(/ /g, "");
+    const LET = Object.keys(M).sort();
+    const PARES = []; for (let i = 0; i < SOLO.length; i += 2) PARES.push(SOLO.slice(i, i + 2));
+    let ronda = 0, tipeo = "", token = 0, hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+    let svg = fondoCierre(908) + cabeceraExtra("EL TELÉGRAFO", "PARTE 1 DE " + PARES.length) +
+      '<circle id="exlz" cx="180" cy="152" r="16" fill="' + C.night3 + '" stroke="#2a2030" stroke-width="2"/>';
+    LET.forEach((l, i) => (svg += '<text x="' + (54 + (i % 2) * 150) + '" y="' + (214 + ((i / 2) | 0) * 28) + '" font-size="17" fill="' + C.cream + '">' + l + '</text><text x="' + (84 + (i % 2) * 150) + '" y="' + (214 + ((i / 2) | 0) * 28) + '" font-size="17" letter-spacing="4" fill="' + C.cream2 + '">' + M[l].replace(/\./g, "·").replace(/-/g, "−") + "</text>"));
+    svg += '<text id="exfr" x="180" y="372" text-anchor="middle" font-size="19" letter-spacing="5" fill="' + C.pink + '"></text>' +
+      '<text id="extip" x="180" y="398" text-anchor="middle" font-size="16" letter-spacing="8" fill="' + C.cream2 + '"> </text>';
+    LET.forEach((l, i) => (svg += '<g data-i="' + i + '"><rect x="' + (19 + (i % 5) * 66) + '" y="' + (418 + ((i / 5) | 0) * 62) + '" width="58" height="52" rx="6" fill="' + C.night + '" stroke="#2a2030" stroke-width="1.5"/><text x="' + (48 + (i % 5) * 66) + '" y="' + (452 + ((i / 5) | 0) * 62) + '" text-anchor="middle" font-size="22" fill="' + C.cream + '">' + l + "</text></g>"));
+    svg += '<g data-i="30"><rect x="110" y="560" width="140" height="42" rx="6" fill="none" stroke="' + C.cream2 + '" stroke-width="1.5"/><text x="180" y="586" text-anchor="middle" font-size="13" letter-spacing="4" fill="' + C.cream2 + '">REPETIR</text></g>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg"), luz = el.querySelector("#exlz"), tip = el.querySelector("#extip"), fr = el.querySelector("#exfr");
+    wrap.dataset.palabra = SOLO; wrap.dataset.letras = LET.join("");
+    function mostrar() {
+      let n = ronda * 2, t = "";
+      for (const ch of FRASE) { if (ch === " ") t += "  "; else { t += n > 0 ? ch : "·"; n--; } }
+      fr.textContent = t;
+    }
+    async function transmitir() {
+      const mi = ++token; await sleep(500);
+      if (!PARES[ronda]) return;
+      for (const ch of PARES[ronda]) {
+        for (const s of M[ch]) {
+          if (!vivo || mi !== token) return;
+          luz.setAttribute("fill", C.amber); Sonido.nota(700);
+          await sleep(s === "." ? 220 : 620); luz.setAttribute("fill", C.night3); await sleep(240);
+        }
+        await sleep(850);
+      }
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      if (i === 30) { transmitir(); return; }
+      const par = PARES[ronda];
+      if (tipeo.length >= par.length) return;
+      tipeo += LET[i]; Sonido.play("tap"); tip.textContent = tipeo;
+      if (tipeo.length < par.length) return;
+      if (tipeo === par) {
+        ronda++; tipeo = ""; mostrar();
+        if (ronda >= PARES.length) { hecho = true; token++; Sonido.play("sello"); el.querySelector("#exsub").textContent = "MENSAJE RECIBIDO"; tip.textContent = " "; setTimeout(() => vivo && resolver(), 1800); return; }
+        Sonido.play("par"); el.querySelector("#exsub").textContent = "PARTE " + (ronda + 1) + " DE " + PARES.length;
+        setTimeout(() => { tip.textContent = " "; transmitir(); }, 700);
+      } else { Sonido.play("error"); setTimeout(() => { tipeo = ""; tip.textContent = " "; }, 600); }
+    });
+    mostrar();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("La radio también sabe hablar en Morse.", 4200); transmitir(); }, destruir() { vivo = false; token++; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 9 · ADIVINANZAS DEL CARTERO (sala 1) · cuatro acertijos
+// ===================================================================
+const Extra9 = {
+  pistas: [
+    "Leé cada adivinanza con calma: todas hablan de cosas que tienen que ver con el correo.",
+    "Si dudás entre dos respuestas, fijate cuál encaja con todas las partes de la frase, no solo con una.",
+    "Las respuestas, en orden, son: un sello, el cartero, el buzón y un sobre."
+  ],
+  construir() {
+    const A = [
+      { t: "Viajo por el mundo entero y nunca me muevo de mi esquina. ¿Qué soy?", o: ["Un sello", "Un mapa", "Una brújula", "Un globo"] },
+      { t: "Voy de casa en casa y nunca me dejan pasar. Todos me esperan. ¿Quién soy?", o: ["El cartero", "El vecino", "El perro", "El viento"] },
+      { t: "Tengo boca y no hablo. Me dan de comer papel y nunca engordo. ¿Qué soy?", o: ["El buzón", "La papelera", "Un horno", "Una alcancía"] },
+      { t: "Me cierran con saliva y me abren con ansias. Llevo adentro lo que nadie ve hasta que llego. ¿Qué soy?", o: ["Un sobre", "Una puerta", "Una maleta", "Un libro"] }
+    ];
+    let n = 0, hecho = false, vivo = true, resolver, orden = [];
+    const ok = new Promise((r) => (resolver = r));
+    const lineas = (t) => { const w = t.split(" "), L = []; let c = ""; w.forEach((x) => { if ((c + " " + x).trim().length > 32) { L.push(c); c = x; } else c = (c + " " + x).trim(); }); L.push(c); return L; };
+    let svg = fondoCierre(909) + cabeceraExtra("ADIVINANZAS DEL CARTERO", "ADIVINANZA 1 DE 4") + '<g id="exq"></g>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg"), gq = el.querySelector("#exq");
+    function pinta() {
+      const a = A[n];
+      orden = [0, 1, 2, 3]; for (let i = 3; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [orden[i], orden[j]] = [orden[j], orden[i]]; }
+      el.querySelector("#exsub").textContent = "ADIVINANZA " + (n + 1) + " DE " + A.length;
+      let q = '<rect x="26" y="136" width="308" height="170" rx="6" fill="' + C.night + '" stroke="#2a2030" stroke-width="2"/>';
+      lineas(a.t).forEach((l, i) => (q += '<text x="180" y="' + (176 + i * 24) + '" text-anchor="middle" font-size="14" fill="' + C.cream + '">' + l + "</text>"));
+      orden.forEach((k, i) => {
+        const y = 330 + i * 66;
+        q += '<g data-i="' + k + '"><rect x="40" y="' + y + '" width="280" height="52" rx="6" fill="' + C.night2 + '" stroke="' + C.cream2 + '" stroke-width="1.5"/>' +
+          '<text x="180" y="' + (y + 32) + '" text-anchor="middle" font-size="15" letter-spacing="2" fill="' + C.cream + '">' + a.o[k].toUpperCase() + "</text></g>";
+      });
+      gq.innerHTML = q;
+      wrap.dataset.resp = a.o[0];
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      if (i !== 0) { Sonido.play("error"); UI.say("No es esa. Leé otra vez.", 2600); return; }
+      Sonido.play("par"); n++;
+      if (n >= A.length) { hecho = true; Sonido.play("sello"); gq.innerHTML = ""; el.querySelector("#exsub").textContent = "TODAS RESUELTAS"; setTimeout(() => vivo && resolver(), 1300); return; }
+      pinta();
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("El cartero dejó unas adivinanzas pegadas en la pared.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 10 · TUBO NEUMÁTICO (sala 1) · girar piezas para conectar el camino
+// ===================================================================
+const Extra10 = {
+  pistas: [
+    "El tubo neumático lleva las cartas desde la entrada (arriba a la izquierda) hasta la salida (abajo a la derecha). Tocá una pieza para girarla un cuarto de vuelta.",
+    "Las piezas conectadas con la entrada se pintan de rosa. Empezá por la primera pieza: girala hasta que apunte hacia donde sigue el camino, y avanzá pieza por pieza.",
+    "El camino solo va hacia la derecha y hacia abajo, sin volver. Una pieza recta une dos lados enfrentados; una pieza en curva une dos lados que se tocan. Las piezas fuera del camino no hace falta tocarlas."
+  ],
+  construir() {
+    const R = 6, Cn = 5, T = 56, X0 = 40, Y0 = 170;
+    const N = 1, E = 2, S = 4, W = 8;
+    const rotar = (m) => ((m << 1) | (m >> 3)) & 15;
+    // Camino monótono (solo derecha y abajo) de la entrada a la salida
+    const pasos = [].concat(Array(Cn - 1).fill("E"), Array(R - 1).fill("S"));
+    for (let i = pasos.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [pasos[i], pasos[j]] = [pasos[j], pasos[i]]; }
+    const objetivo = new Array(R * Cn).fill(0), camino = [];
+    let r = 0, c = 0, antes = W; // la entrada llega por el lado oeste de (0,0)
+    for (let k = 0; k <= pasos.length; k++) {
+      const sig = k < pasos.length ? pasos[k] : "E"; // la salida sale por el lado este de la última pieza
+      objetivo[r * Cn + c] = antes | (sig === "E" ? E : S);
+      camino.push(r * Cn + c);
+      if (k < pasos.length) { if (sig === "E") { c++; antes = W; } else { r++; antes = N; } }
+    }
+    const tipos = [5, 3, 7]; // recta, curva, te
+    let m = objetivo.map((v, i) => v || tipos[(Math.random() * 3) | 0]);
+    camino.forEach((i) => { let k = 1 + ((Math.random() * 3) | 0); while (k--) m[i] = rotar(m[i]); }); // desordena el camino
+    m = m.map((v, i) => { if (!objetivo[i]) { let k = (Math.random() * 4) | 0; while (k--) v = rotar(v); } return v; });
+    let hecho = false, vivo = true, resolver;
+    const ok = new Promise((rr) => (resolver = rr));
+
+    let svg = fondoCierre(910) + cabeceraExtra("EL TUBO NEUMÁTICO", "CONECTÁ ENTRADA Y SALIDA") +
+      '<rect x="' + (X0 - 8) + '" y="' + (Y0 - 8) + '" width="' + (Cn * T + 16) + '" height="' + (R * T + 16) + '" rx="6" fill="' + C.night + '" stroke="#2a2030" stroke-width="2"/>' +
+      '<text x="' + X0 + '" y="' + (Y0 - 16) + '" font-size="9" letter-spacing="3" fill="' + C.cream2 + '">ENTRADA</text>' +
+      '<text x="' + (X0 + Cn * T) + '" y="' + (Y0 + R * T + 24) + '" text-anchor="end" font-size="9" letter-spacing="3" fill="' + C.cream2 + '">SALIDA</text>' +
+      '<g id="ext"></g>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg"), gt = el.querySelector("#ext");
+    wrap.dataset.sol = camino.map((i) => i + ":" + objetivo[i]).join(",");
+
+    function conectadas() {
+      const vis = new Set(); if (!(m[0] & W)) return vis;
+      const cola = [0]; vis.add(0);
+      while (cola.length) {
+        const i = cola.shift(), rr = (i / Cn) | 0, cc = i % Cn;
+        [[N, -1, 0, S], [E, 0, 1, W], [S, 1, 0, N], [W, 0, -1, E]].forEach(([bit, dr, dc, opp]) => {
+          const r2 = rr + dr, c2 = cc + dc;
+          if (!(m[i] & bit) || r2 < 0 || r2 >= R || c2 < 0 || c2 >= Cn) return;
+          const j = r2 * Cn + c2;
+          if ((m[j] & opp) && !vis.has(j)) { vis.add(j); cola.push(j); }
+        });
+      }
+      return vis;
+    }
+    function pinta() {
+      const vis = conectadas(); let t = "";
+      m.forEach((v, i) => {
+        const x = X0 + (i % Cn) * T, y = Y0 + ((i / Cn) | 0) * T, cx = x + T / 2, cy = y + T / 2, col = vis.has(i) ? C.pink : C.cream2;
+        t += '<g data-i="' + i + '"><rect x="' + x + '" y="' + y + '" width="' + T + '" height="' + T + '" fill="' + C.night2 + '" stroke="' + C.night3 + '" stroke-width="1"/>';
+        [[N, 0, -1], [E, 1, 0], [S, 0, 1], [W, -1, 0]].forEach(([bit, dx, dy]) => {
+          if (v & bit) t += '<path d="M' + cx + " " + cy + " L" + (cx + dx * T / 2) + " " + (cy + dy * T / 2) + '" stroke="' + col + '" stroke-width="10" stroke-linecap="butt"/>';
+        });
+        t += '<circle cx="' + cx + '" cy="' + cy + '" r="6" fill="' + col + '"/></g>';
+      });
+      // tramos de entrada y salida
+      const fin = Cn * R - 1;
+      t += '<path d="M' + (X0 - 8) + " " + (Y0 + T / 2) + " L" + X0 + " " + (Y0 + T / 2) + '" stroke="' + (vis.has(0) ? C.pink : C.cream2) + '" stroke-width="10"/>' +
+        '<path d="M' + (X0 + Cn * T) + " " + (Y0 + (R - 0.5) * T) + " L" + (X0 + Cn * T + 8) + " " + (Y0 + (R - 0.5) * T) + '" stroke="' + (vis.has(fin) && (m[fin] & E) ? C.pink : C.cream2) + '" stroke-width="10"/>';
+      gt.innerHTML = t;
+      wrap.dataset.masks = m.join(",");
+      return vis.has(fin) && (m[fin] & E);
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const i = tocado(e);
+      if (i < 0) return;
+      m[i] = rotar(m[i]); Sonido.play("tick");
+      if (pinta()) {
+        hecho = true; Sonido.play("sello");
+        el.querySelector("#exsub").textContent = "CAMINO ABIERTO";
+        setTimeout(() => vivo && resolver(), 1300);
+      }
+    });
+    pinta();
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("El tubo del correo está desarmado. Las cartas no pueden pasar.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// ===================================================================
+// EXTRA 11 · CAJA FUERTE CON GANZÚAS (sala 1) · fijar cuatro pernos
+// ===================================================================
+const Extra11 = {
+  pistas: [
+    "Cada perno tiene una altura secreta. Arrastrá hacia arriba, despacio, el perno que tiene el punto rosa encima y soltalo cuando creas que está en la altura justa.",
+    "Mientras arrastrás, el perno cambia de color: gris es frío, ámbar es tibio y rosa es caliente. Cuando esté rosa y tiemble un poco, estás cerca. Soltalo ahí.",
+    "Hay que soltarlo bien adentro de la zona rosa, no en el borde. Si cae, probá otra vez más despacio: la altura de cada perno no cambia. Los pernos van de a uno: el que tiene el punto rosa."
+  ],
+  construir() {
+    const COLX = [96, 156, 216, 276], PW = 40, SY0 = 200, SH = 290, KH = 26, DH = 34, TOL = 4, CAL = 10, TIB = 25;
+    const objetivo = [], usados = [];
+    while (objetivo.length < 4) { const v = 28 + ((Math.random() * 64) | 0); if (usados.every((u) => Math.abs(u - v) > 14)) { objetivo.push(v); usados.push(v); } }
+    let orden = [0, 1, 2, 3]; for (let i = 3; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [orden[i], orden[j]] = [orden[j], orden[i]]; }
+    let fijado = 0, valor = [0, 0, 0, 0], arrastre = -1, hecho = false, vivo = true, resolver;
+    const ok = new Promise((r) => (resolver = r));
+    const ACERO = "#4b5368", ACERO2 = "#5f6a82", LATON = "#c9a35a", OSC = "#2a2030";
+
+    // ---------- Puerta de la caja fuerte ----------
+    let svg = fondoCierre(911) + cabeceraExtra("LA CAJA FUERTE", "ABRILA CON LAS GANZÚAS") +
+      '<rect x="22" y="124" width="316" height="476" rx="12" fill="' + OSC + '"/>' +
+      '<rect x="28" y="130" width="304" height="464" rx="9" fill="' + ACERO + '"/>' +
+      '<rect x="40" y="142" width="280" height="440" rx="6" fill="none" stroke="' + ACERO2 + '" stroke-width="2"/>';
+    [[48, 150], [312, 150], [48, 574], [312, 574]].forEach((q) => (svg += '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="5" fill="' + ACERO2 + '" stroke="' + OSC + '" stroke-width="1.5"/>'));
+    // bisagras a la izquierda
+    [190, 480].forEach((y) => (svg += '<rect x="22" y="' + y + '" width="14" height="46" rx="3" fill="' + ACERO2 + '" stroke="' + OSC + '" stroke-width="2"/>'));
+    // placa de la cerradura
+    svg += '<rect x="58" y="166" width="244" height="344" rx="6" fill="' + OSC + '"/><rect x="62" y="170" width="236" height="336" rx="4" fill="' + ACERO2 + '"/>';
+    // cámaras de los pernos
+    for (let k = 0; k < 4; k++) {
+      const x = COLX[k] - PW / 2 - 4;
+      svg += '<rect x="' + x + '" y="' + (SY0 - 6) + '" width="' + (PW + 8) + '" height="' + (SH + 12) + '" rx="4" fill="' + OSC + '"/>' +
+        '<rect x="' + (x + 3) + '" y="' + (SY0 - 3) + '" width="' + (PW + 2) + '" height="' + (SH + 6) + '" rx="3" fill="#232a3b"/>' +
+        '<path class="exs" d="" fill="none" stroke="' + C.cream2 + '" stroke-width="2.5" stroke-linejoin="round"/>' +
+        '<rect class="exv" x="' + (COLX[k] - PW / 2 + 2) + '" y="0" width="' + (PW - 4) + '" height="' + DH + '" rx="2" fill="' + C.cream2 + '" stroke="' + OSC + '" stroke-width="2"/>' +
+        '<g data-i="' + k + '"><rect x="' + (COLX[k] - PW / 2 - 8) + '" y="' + (SY0 - 10) + '" width="' + (PW + 16) + '" height="' + (SH + 20) + '" fill="#000" opacity="0"/>' +
+        '<rect class="exh" x="' + (COLX[k] - PW / 2 + 2) + '" y="0" width="' + (PW - 4) + '" height="' + KH + '" rx="2" fill="' + LATON + '" stroke="' + OSC + '" stroke-width="2"/></g>' +
+        '<circle class="exd" cx="' + COLX[k] + '" cy="' + (SY0 - 22) + '" r="6" fill="none"/>';
+    }
+    // línea de corte del cilindro
+    svg += '<rect x="58" y="' + (SY0 + SH - 6) + '" width="244" height="0" fill="none"/>' +
+      // llave de tensión (L) y ganzúa
+      '<path d="M70 528 H118 V552" fill="none" stroke="' + C.cream2 + '" stroke-width="5" stroke-linejoin="round"/>' +
+      '<path id="expick" d="" fill="none" stroke="' + C.cream + '" stroke-width="3.5" stroke-linecap="round"/>' +
+      '<circle id="expickh" r="9" fill="' + C.pink + '" stroke="' + OSC + '" stroke-width="2"/>' +
+      // cerradura redonda con ojo de llave
+      '<circle cx="304" cy="560" r="20" fill="' + OSC + '"/><circle cx="304" cy="560" r="16" fill="' + ACERO2 + '"/>' +
+      '<circle cx="304" cy="556" r="4" fill="' + OSC + '"/><path d="M301 558 L307 558 L309 570 L299 570 Z" fill="' + OSC + '"/>' +
+      '<text id="exmsg" x="180" y="640" text-anchor="middle" font-size="12" letter-spacing="3" fill="' + C.cream2 + '">0 DE 4 PERNOS</text>';
+    const wrap = makeSVG(svg), el = wrap.querySelector("svg");
+    const hs = [...el.querySelectorAll(".exh")], vs = [...el.querySelectorAll(".exv")], sp = [...el.querySelectorAll(".exs")], ds = [...el.querySelectorAll(".exd")];
+    const msg = el.querySelector("#exmsg"), pick = el.querySelector("#expick"), pickh = el.querySelector("#expickh");
+    wrap.dataset.objetivo = objetivo.join(","); wrap.dataset.orden = orden.join(",");
+    const ytop = (v) => SY0 + SH - KH - (v / 100) * (SH - KH - DH - 14);
+    function calor(k) { const d = Math.abs(valor[k] - objetivo[k]); return d <= CAL ? C.pink : d <= TIB ? C.amber : LATON; }
+    function resorte(x, y1, y2) {
+      let d = "M" + x + " " + y1, n = 7; const h = (y2 - y1) / n;
+      for (let i = 0; i < n; i++) d += " L" + (x + (i % 2 ? -11 : 11)) + " " + (y1 + h * (i + 0.5));
+      return d + " L" + x + " " + y2;
+    }
+    function pinta(vib) {
+      hs.forEach((h, k) => {
+        const fij = orden.indexOf(k) < fijado;
+        const y = fij ? ytop(objetivo[k]) : ytop(valor[k]);
+        const act = k === orden[fijado] && !hecho;
+        let dx = 0;
+        if (act && arrastre === k && vib && Math.abs(valor[k] - objetivo[k]) <= CAL) dx = (Math.random() - 0.5) * 3;
+        h.setAttribute("y", y); h.setAttribute("x", COLX[k] - PW / 2 + 2 + dx);
+        h.setAttribute("fill", fij ? C.cream : arrastre === k && act ? calor(k) : LATON);
+        vs[k].setAttribute("y", y - DH); vs[k].setAttribute("x", COLX[k] - PW / 2 + 2 + dx);
+        sp[k].setAttribute("d", resorte(COLX[k], SY0 + 2, y - DH));
+      });
+      ds.forEach((d, k) => { const act = k === orden[fijado] && !hecho; d.setAttribute("fill", act ? C.pink : "none"); });
+      // ganzúa: apunta al perno que se está arrastrando o al activo
+      const kp = arrastre >= 0 ? arrastre : orden[Math.min(fijado, 3)];
+      if (!hecho) {
+        const yb = ytop(valor[kp]) + KH + 4, tx = COLX[kp];
+        pick.setAttribute("d", "M" + tx + " " + yb + " L" + (tx + 56) + " " + (yb + 56));
+        pickh.setAttribute("cx", tx + 62); pickh.setAttribute("cy", yb + 62); pickh.setAttribute("opacity", 1);
+      } else { pick.setAttribute("d", ""); pickh.setAttribute("opacity", 0); }
+      msg.textContent = fijado + " DE 4 PERNOS";
+      wrap.dataset.fijados = fijado;
+    }
+    function aValor(e) {
+      const p = svgPoint(el, e.clientX, e.clientY);
+      return Math.max(0, Math.min(100, ((SY0 + SH - KH / 2 - p.y) / (SH - KH - DH - 14)) * 100));
+    }
+    el.addEventListener("pointerdown", (e) => {
+      if (hecho) return;
+      const k = tocado(e);
+      if (k < 0 || k > 3) return;
+      arrastre = k; try { el.setPointerCapture(e.pointerId); } catch (x) {}
+      valor[k] = aValor(e); pinta(true);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (arrastre < 0 || hecho) return;
+      const k = arrastre, antes = valor[k];
+      valor[k] = aValor(e);
+      if (k === orden[fijado] && Math.abs(valor[k] - objetivo[k]) <= CAL && Math.abs(antes - objetivo[k]) > CAL) Sonido.play("tick");
+      pinta(true);
+    });
+    function suelta() {
+      if (arrastre < 0 || hecho) return;
+      const k = arrastre; arrastre = -1;
+      if (k === orden[fijado] && Math.abs(valor[k] - objetivo[k]) <= TOL) {
+        fijado++; Sonido.play("candado");
+        if (fijado === 4) {
+          hecho = true; Sonido.play("sello"); el.querySelector("#exsub").textContent = "CAJA ABIERTA"; pinta(false);
+          setTimeout(() => vivo && resolver(), 1400); return;
+        }
+      } else { valor[k] = 0; if (k === orden[fijado]) Sonido.play("error"); else Sonido.play("papel"); }
+      pinta(false);
+    }
+    el.addEventListener("pointerup", suelta);
+    el.addEventListener("pointercancel", suelta);
+    pinta(false);
+    return { el: wrap, resuelto: ok, alEntrar() { UI.say("Una caja fuerte. No hay llave, pero sí unas ganzúas.", 4200); }, destruir() { vivo = false; } };
+  }
+};
+
+// Por sala: [extra A, extra B]
+const EXTRAS = [[Extra9, Extra11], [Extra2, Extra6], [Extra3, Extra7], [Extra8]];
 
 </script>
 <script>
@@ -2914,42 +3765,40 @@ async function introduccion() {
 // UNA SALA
 // ===================================================================
 async function jugarSala(i) {
-  const S = SALAS[i], P2 = PASOS2[i];
+  const S = SALAS[i];
+  // Fácil: 2 desafíos por sala. Difícil: 3 (el tercero es nuevo).
+  const pasos = [S, PASOS2[i]].concat(CONFIG.DIFICIL ? EXTRAS[i] : []);
   UI.hudShow(false);
   UI.hush();
-  let paso = State.paso(i);                 // 0 = primer desafío, 1 = segundo
-  let sala = paso === 0 ? S.construir() : P2.construir();
+  let k = Math.min(State.paso(i), pasos.length - 1);   // retoma donde quedó
+  let sala = pasos[k].construir();
 
   await UI.titleCard(S.kicker, S.titulo, () => {
     UI.bars(false);
     UI.showScene(sala.el);
     Sonido.setRainMuffle(false);
   });
-
   UI.hudShow(true);
   UI.updateTray();
 
-  if (paso === 0) {
-    UI.setupHints(i * 2, S.pistas);
+  let primero = true;
+  for (; k < pasos.length; k++) {
+    if (!primero) {                         // transición entre desafíos
+      await UI.fade(true, 700);
+      sala = pasos[k].construir();
+      UI.showScene(sala.el);
+      await UI.fade(false, 900);
+    }
+    primero = false;
+    UI.setupHints(i * 4 + k, pasos[k].pistas);
     sala.alEntrar();
     await sala.resuelto;                    // no avanza hasta resolver la prueba
     UI.stopHints();
     sala.destruir();
-    State.setPaso(i, 1);
-    Sonido.play("chime");
-    await UI.fade(true, 700);
-    sala = P2.construir();
-    UI.showScene(sala.el);
-    await UI.fade(false, 900);
+    if (k < pasos.length - 1) { State.setPaso(i, k + 1); Sonido.play("chime"); }
   }
 
-  UI.setupHints(i * 2 + 1, P2.pistas);
-  sala.alEntrar();
-  await sala.resuelto;
-
   State.resolver(i);                        // el progreso queda guardado
-  UI.stopHints();
-  sala.destruir();
   Sonido.play("chime");
   await sleep(900);
   await UI.cartaSube();
@@ -3019,6 +3868,8 @@ function prepararDev() {
   mk("Sala 4", () => ir(3));
   mk("Final", () => ir(4));
   [0, 1, 2, 3].forEach((k) => mk("Paso 2 · S" + (k + 1), () => { ir(k); State.setPaso(k, 1); location.reload(); }));
+  if (CONFIG.DIFICIL) [0, 1, 2, 3].forEach((k) => mk("Paso 3 · S" + (k + 1), () => { ir(k); State.setPaso(k, 2); location.reload(); }));
+  if (CONFIG.DIFICIL) [0, 1, 2, 3].forEach((k) => mk("Paso 4 · S" + (k + 1), () => { ir(k); State.setPaso(k, 3); location.reload(); }));
   mk("Reiniciar todo", () => { State.reset(); State.set("iniciado", false); location.reload(); });
 }
 
